@@ -13,6 +13,8 @@ import { yearOptions } from "@/features/budget/options";
 import { InsightDisclaimer } from "@/features/insights/components/InsightList";
 import StateHighlights from "@/features/insights/components/StateHighlights";
 import { countMunicipalitiesWithInsights, getInsights, getStateHighlights } from "@/features/insights/rules";
+import Term from "@/components/ui/Term";
+import { getLegalSummary } from "@/features/legal/checks";
 import { quantileBuckets } from "@/features/map/buckets";
 import { getMunicipalityCards } from "@/features/map/explorerData";
 import { getMunicipalityShapes, mapSource } from "@/features/map/geo";
@@ -34,6 +36,10 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const map = quantileBuckets(indicator.values(year), indicator.format);
   const territories = getTerritoryRows(year);
   const flagged = countMunicipalitiesWithInsights(year);
+  const legalSummary = getLegalSummary(
+    MUNICIPALITIES.map((m) => m.code),
+    year,
+  );
 
   return (
     <>
@@ -98,7 +104,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
               </span>
             </a>
             <p className="mt-auto pt-6 text-sm text-ink-500">
-              Passe o mouse sobre um município para ver a ficha. Clique para fixá-la.
+              Passe o mouse (ou toque, no celular) sobre um município para ver a ficha. Clique para fixá-la.
             </p>
           </div>
         }
@@ -128,6 +134,60 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         }
       >
         <StateHighlights highlights={getStateHighlights(year)} year={year} />
+      </Section>
+
+      <Section
+        id="obrigacoes"
+        title="O que a lei exige das prefeituras"
+        description={
+          <p>
+            Mínimos da Constituição para educação e saúde e limite da Lei de Responsabilidade Fiscal para gasto com
+            pessoal, conforme declarado pelas próprias prefeituras em {year}.
+          </p>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              term: "minimo-educacao" as const,
+              label: "Educação: mínimo de 25%",
+              value: legalSummary.educationBelow,
+              of: legalSummary.educationDeclared,
+              text: "abaixo do mínimo",
+            },
+            {
+              term: "minimo-saude" as const,
+              label: "Saúde: mínimo de 15%",
+              value: legalSummary.healthBelow,
+              of: legalSummary.healthDeclared,
+              text: "abaixo do mínimo",
+            },
+            {
+              term: "limite-pessoal" as const,
+              label: "Pessoal: limite de 54% da RCL",
+              value: legalSummary.personnelAboveLimit,
+              of: legalSummary.personnelDeclared,
+              text: `acima do limite (e mais ${legalSummary.personnelAboveAlert} acima do alerta)`,
+            },
+          ].map((c) => (
+            <div key={c.label} className={`rounded-lg border p-5 ${c.value > 0 ? "border-alert-200 bg-alert-50/60" : "border-paper-200"}`}>
+              <p className="text-sm font-medium text-ink-700">
+                <Term id={c.term}>{c.label}</Term>
+              </p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-ink-900">
+                {c.value} <span className="text-base font-medium text-ink-500">de {c.of}</span>
+              </p>
+              <p className="text-sm text-ink-700">municípios {c.text}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-ink-500">
+          Contados apenas os municípios que declararam o dado ao Tesouro Nacional. Detalhes em cada página de município,
+          no capítulo &ldquo;Obrigações legais&rdquo;.{" "}
+          <Link href={`/municipios?ano=${year}&ordem=atencao`} className="text-brand-700 hover:underline">
+            Ver lista
+          </Link>
+        </p>
       </Section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

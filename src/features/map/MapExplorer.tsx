@@ -96,7 +96,17 @@ export default function MapExplorer({ shapes, values, legend, cards, indicatorLa
         </figure>
       </div>
 
-      <aside className="flex flex-col bg-paper-100/60" aria-live="polite" data-testid="map-card">
+      {/* On phones a pinned card becomes a bottom sheet over the map. */}
+      <aside
+        className={`flex flex-col bg-paper-100/60 ${
+          selected
+            ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:max-h-[78vh] max-lg:overflow-y-auto max-lg:rounded-t-2xl max-lg:border-t max-lg:border-paper-300 max-lg:bg-white max-lg:pb-[env(safe-area-inset-bottom)] max-lg:shadow-[0_-8px_30px_rgba(15,23,42,0.18)]"
+            : ""
+        }`}
+        aria-live="polite"
+        data-testid="map-card"
+      >
+        {selected && <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-paper-300 lg:hidden" aria-hidden />}
         {card ? (
           <div className="flex flex-1 flex-col p-5">
             <div className="flex items-start justify-between gap-2">

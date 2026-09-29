@@ -6,9 +6,9 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Mapa" },
   { href: "/municipios", label: "Municípios" },
+  { href: "/comparar", label: "Comparar" },
   { href: "/estado", label: "Governo do Estado" },
-  { href: "/eleicoes", label: "Eleições" },
-  { href: "/quiz", label: "Quiz" },
+  { href: "/participe", label: "Participe" },
   { href: "/sobre", label: "Metodologia" },
 ];
 

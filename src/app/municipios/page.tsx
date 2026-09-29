@@ -149,6 +149,10 @@ export default async function MunicipalitiesPage({ searchParams }: PageProps<"/m
               </Link>
             </>
           )}
+          {" "}·{" "}
+          <a href={`/dados/municipios?ano=${year}`} className="text-brand-700 underline underline-offset-2">
+            baixar CSV de {year}
+          </a>
         </p>
       </div>
 
