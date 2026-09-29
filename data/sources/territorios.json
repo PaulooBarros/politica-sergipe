@@ -1,0 +1,98 @@
+{
+  "source": "Governo de Sergipe, Territórios de Planejamento (Decreto estadual nº 24.338/2007). Lista transcrita da reportagem \"Sergipe: saiba mais sobre os oito territórios do Estado\" (A8 Sergipe, republicando o Governo de Sergipe).",
+  "url": "http://a8se.com/noticias/sergipe/sergipe-saiba-mais-sobre-os-oito-territorios-do-estado",
+  "pendingOfficialCheck": true,
+  "territories": {
+    "Alto Sertão Sergipano": [
+      "Canindé de São Francisco",
+      "Gararu",
+      "Monte Alegre de Sergipe",
+      "Nossa Senhora da Glória",
+      "Poço Redondo",
+      "Porto da Folha",
+      "Nossa Senhora de Lourdes"
+    ],
+    "Médio Sertão Sergipano": [
+      "Aquidabã",
+      "Cumbe",
+      "Feira Nova",
+      "Graccho Cardoso",
+      "Itabi",
+      "Nossa Senhora das Dores"
+    ],
+    "Baixo São Francisco": [
+      "Muribeca",
+      "Amparo do São Francisco",
+      "Brejo Grande",
+      "Canhoba",
+      "São Francisco",
+      "Cedro de São João",
+      "Ilha das Flores",
+      "Japoatã",
+      "Malhada dos Bois",
+      "Neópolis",
+      "Pacatuba",
+      "Propriá",
+      "Santana do São Francisco",
+      "Telha"
+    ],
+    "Agreste Central Sergipano": [
+      "Areia Branca",
+      "Campo do Brito",
+      "Carira",
+      "Frei Paulo",
+      "Itabaiana",
+      "Macambira",
+      "Malhador",
+      "Moita Bonita",
+      "Nossa Senhora Aparecida",
+      "São Miguel do Aleixo",
+      "Pinhão",
+      "Ribeirópolis",
+      "São Domingos",
+      "Pedra Mole"
+    ],
+    "Centro-Sul Sergipano": [
+      "Poço Verde",
+      "Tobias Barreto",
+      "Riachão do Dantas",
+      "Lagarto",
+      "Simão Dias"
+    ],
+    "Sul Sergipano": [
+      "Cristinápolis",
+      "Tomar do Geru",
+      "Arauá",
+      "Boquim",
+      "Indiaroba",
+      "Itabaianinha",
+      "Pedrinhas",
+      "Salgado",
+      "Santa Luzia do Itanhy",
+      "Umbaúba",
+      "Estância"
+    ],
+    "Leste Sergipano": [
+      "General Maynard",
+      "Rosário do Catete",
+      "Divina Pastora",
+      "Santa Rosa de Lima",
+      "Siriri",
+      "Capela",
+      "Japaratuba",
+      "Pirambu",
+      "Carmópolis"
+    ],
+    "Grande Aracaju": [
+      "Aracaju",
+      "Barra dos Coqueiros",
+      "Itaporanga d'Ajuda",
+      "Laranjeiras",
+      "Maruim",
+      "Nossa Senhora do Socorro",
+      "Riachuelo",
+      "São Cristóvão",
+      "Santo Amaro das Brotas"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/*
+ * Identidade institucional: branco e cinza-azulado (paper/ink), acento
+ * berinjela (brand) e âmbar reservado para alertas (alert). Nenhuma das cores
+ * remete a partido. Par brand-500/alert-500 validado para daltonismo sobre branco.
+ */
+@theme {
+  --color-brand-50: #f7f3fb;
+  --color-brand-100: #ede4f6;
+  --color-brand-200: #dac9ec;
+  --color-brand-300: #bfa2dc;
+  --color-brand-400: #9d76c6;
+  --color-brand-500: #7c4dab;
+  --color-brand-600: #683c94;
+  --color-brand-700: #55307a;
+  --color-brand-800: #432662;
+  --color-brand-900: #321c4a;
+  --color-brand-950: #22122f;
+
+  --color-alert-50: #fffbeb;
+  --color-alert-100: #fef3c7;
+  --color-alert-200: #fde68a;
+  --color-alert-300: #fcd34d;
+  --color-alert-400: #f59e0b;
+  --color-alert-500: #d97706;
+  --color-alert-600: #b45309;
+  --color-alert-700: #92400e;
+  --color-alert-800: #78350f;
+
+  --color-paper-50: #ffffff;
+  --color-paper-100: #f4f6f9;
+  --color-paper-200: #e3e8ef;
+  --color-paper-300: #cbd3de;
+  --color-paper-400: #94a1b3;
+
+  --color-ink-500: #5b6779;
+  --color-ink-700: #334155;
+  --color-ink-900: #0f172a;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+}
+
+body {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-feature-settings: "tnum" 0, "cv11" 1;
+}
