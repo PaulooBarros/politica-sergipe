@@ -1,5 +1,5 @@
 import { getSizeClass, MUNICIPALITIES, type Municipality, type SizeClass } from "@/features/municipalities/registry";
-import { FUNCTIONS, getEntityYear, type EntityYear, YEARS } from "./data";
+import { FUNCTIONS, getEntityYear, type EntityYear, toRealValue, YEARS } from "./data";
 
 export type Figures = {
   population: number | null;
@@ -185,22 +185,28 @@ export function getAreaRows(entityCode: string, year: number, withStateMedian: b
 
 export type SeriesPoint = { year: number; value: number | null };
 
+/** When `real` is true, values are converted to reais of the IPCA base year. */
+const adjust = (value: number | null, year: number, real: boolean) => (real ? toRealValue(value, year) : value);
+
 /** Per-capita paid over the years, oldest first. */
-export function getPerCapitaSeries(entityCode: string, area: string | null): SeriesPoint[] {
+export function getPerCapitaSeries(entityCode: string, area: string | null, real = false): SeriesPoint[] {
   return [...YEARS].reverse().map((year) => {
     const f = pickFigures(getEntityYear(entityCode, year), area);
-    return { year, value: ratio(f.paid, f.population) };
+    return { year, value: adjust(ratio(f.paid, f.population), year, real) };
   });
 }
 
-export function getStateMedianSeries(area: string | null): SeriesPoint[] {
-  return [...YEARS].reverse().map((year) => ({ year, value: medianPerCapita(getMunicipalityRows(year, area)) }));
+export function getStateMedianSeries(area: string | null, real = false): SeriesPoint[] {
+  return [...YEARS]
+    .reverse()
+    .map((year) => ({ year, value: adjust(medianPerCapita(getMunicipalityRows(year, area)), year, real) }));
 }
 
-export function getSizeMedianSeries(code: string, area: string | null): SeriesPoint[] {
+export function getSizeMedianSeries(code: string, area: string | null, real = false): SeriesPoint[] {
   return [...YEARS].reverse().map((year) => {
     const rows = getMunicipalityRows(year, area);
     const self = rows.find((r) => r.code === code);
-    return { year, value: medianPerCapita(rows.filter((r) => r.sizeClass?.id === self?.sizeClass?.id)) };
+    const value = medianPerCapita(rows.filter((r) => r.sizeClass?.id === self?.sizeClass?.id));
+    return { year, value: adjust(value, year, real) };
   });
 }

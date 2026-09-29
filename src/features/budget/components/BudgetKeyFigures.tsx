@@ -1,4 +1,5 @@
 import KeyFigure, { KeyFigureRow } from "@/components/ui/KeyFigure";
+import Term from "@/components/ui/Term";
 import { formatBRL, formatBRLShort, formatPercent } from "@/lib/format";
 import { type Comparison, type Figures, ratio } from "../metrics";
 
@@ -17,7 +18,7 @@ export default function BudgetKeyFigures({ figures, year, comparisons = [] }: Pr
     <KeyFigureRow>
       <KeyFigure
         testId="stat-planned"
-        label="Orçamento previsto"
+        label={<Term id="orcamento-previsto">Orçamento previsto</Term>}
         value={formatBRLShort(figures.planned)}
         tone={figures.planned == null ? "muted" : "default"}
         explanation={
@@ -28,14 +29,14 @@ export default function BudgetKeyFigures({ figures, year, comparisons = [] }: Pr
       />
       <KeyFigure
         testId="stat-paid"
-        label="Gasto real (pago)"
+        label={<Term id="pagamento">Gasto real (pago)</Term>}
         value={formatBRLShort(figures.paid)}
         tone={figures.paid == null ? "muted" : "default"}
         explanation="O que efetivamente saiu do caixa para pagar despesas do ano."
       />
       <KeyFigure
         testId="stat-execution"
-        label="Orçamento executado"
+        label={<Term id="execucao">Orçamento executado</Term>}
         value={formatPercent(execution)}
         explanation={
           execution == null

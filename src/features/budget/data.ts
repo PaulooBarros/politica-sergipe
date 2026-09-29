@@ -1,4 +1,6 @@
 import budgetJson from "../../../data/budget.json";
+import changelogJson from "../../../data/changelog.json";
+import ipcaJson from "../../../data/ipca.json";
 
 export type AreaValues = {
   planned?: number;
@@ -14,6 +16,15 @@ export type Revenue = {
   sources: Record<RevenueSource, number>;
 };
 
+export type LegalItem = { applied: number; minimum: number } | null;
+
+export type Legal = {
+  education: LegalItem;
+  health: LegalItem;
+  fundebPay: LegalItem;
+  personnel: { percent: number; limit: number; prudential: number; alert: number; period: string } | null;
+};
+
 export type EntityYear = {
   population: number | null;
   planned: number | null;
@@ -22,11 +33,19 @@ export type EntityYear = {
   paid: number | null;
   byFunction: Record<string, AreaValues>;
   revenue: Revenue | null;
+  legal: Legal;
 };
 
 type BudgetFile = {
   metadata: {
-    sources: { planned: string; paid: string; revenue: string; territories: string };
+    sources: {
+      planned: string;
+      paid: string;
+      revenue: string;
+      legalMinimums: string;
+      personnel: string;
+      territories: string;
+    };
     urls: { siconfi: string; territories: string };
     downloadedAt: string;
   };
@@ -85,6 +104,23 @@ export const REVENUE_SOURCES: Record<RevenueSource, { label: string; stateLabel?
     description: "Convênios, rendimentos de aplicações, contribuições e demais receitas.",
   },
 };
+
+export const IPCA = {
+  source: ipcaJson.source,
+  baseYear: ipcaJson.baseYear,
+  factors: ipcaJson.factors as Record<string, number>,
+};
+
+/** Expresses an amount of `year` in reais of the IPCA base year. */
+export function toRealValue(value: number | null, year: number) {
+  return value == null ? null : value * (IPCA.factors[year] ?? 1);
+}
+
+export type ChangelogEntry = {
+  date: string;
+  changes: { code: string; name: string; year: number; field: string; before: number | null; after: number | null }[];
+};
+export const CHANGELOG = changelogJson as ChangelogEntry[];
 
 export function getEntityYear(code: string, year: number): EntityYear | null {
   return budget.entities[code]?.[year] ?? null;
