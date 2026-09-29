@@ -23,9 +23,20 @@ export function Th({ children, align = "left", className = "" }: { children?: Re
   );
 }
 
-export function Td({ children, align = "left", className = "" }: { children?: ReactNode; align?: "left" | "right"; className?: string }) {
+export function Td({
+  children,
+  align = "left",
+  className = "",
+  colSpan,
+}: {
+  children?: ReactNode;
+  align?: "left" | "right";
+  className?: string;
+  colSpan?: number;
+}) {
   return (
     <td
+      colSpan={colSpan}
       className={`border-b border-paper-200 px-4 py-3 align-middle ${align === "right" ? "text-right tabular-nums" : ""} ${className}`}
     >
       {children}
