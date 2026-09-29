@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "data:map": "tsx scripts/fetch-map.ts",
-    "data:budget": "tsx scripts/fetch-budget.ts"
+    "data:budget": "tsx scripts/fetch-budget.ts",
+    "data:ipca": "tsx scripts/fetch-ipca.ts"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",

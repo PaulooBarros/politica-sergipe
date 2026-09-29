@@ -1,0 +1,13 @@
+{
+  "source": "IBGE – IPCA, número-índice mensal (SIDRA, tabela 1737); fator pela média anual do índice",
+  "url": "https://apisidra.ibge.gov.br/values/t/1737/n1/all/v/2266/p/202101-202512",
+  "baseYear": 2025,
+  "downloadedAt": "2026-09-29",
+  "factors": {
+    "2021": 1.2527654898892313,
+    "2022": 1.1463801918918652,
+    "2023": 1.0960332174874707,
+    "2024": 1.0501675279604836,
+    "2025": 1
+  }
+}

@@ -63,23 +63,38 @@ type EntityYear = {
   paid: number | null;
   byFunction: Record<string, AreaValues>;
   revenue: Revenue | null;
+  legal: Legal;
 };
 
-type Kind = "dca" | "dca-receita" | "rreo";
+type Kind = "dca" | "dca-receita" | "rreo" | "rreo-simplificado" | "rgf-q" | "rgf-s";
+
+const esfera = (code: string) => (code === STATE_CODE ? "E" : "M");
 
 const QUERIES: Record<Kind, (year: number, code: string) => string> = {
   dca: (year, code) => `dca?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-E&id_ente=${code}`,
   "dca-receita": (year, code) => `dca?an_exercicio=${year}&no_anexo=DCA-Anexo%20I-C&id_ente=${code}`,
   rreo: (year, code) =>
     `rreo?an_exercicio=${year}&nr_periodo=6&co_tipo_demonstrativo=RREO&no_anexo=RREO-Anexo%2002&id_ente=${code}`,
+  "rreo-simplificado": (year, code) =>
+    `rreo?an_exercicio=${year}&nr_periodo=6&co_tipo_demonstrativo=RREO&no_anexo=RREO-Anexo%2014&id_ente=${code}`,
+  // Executive branch personnel spending. Small municipalities may report by semester.
+  "rgf-q": (year, code) =>
+    `rgf?an_exercicio=${year}&in_periodicidade=Q&nr_periodo=3&co_tipo_demonstrativo=RGF&no_anexo=RGF-Anexo%2001&co_esfera=${esfera(code)}&co_poder=E&id_ente=${code}`,
+  "rgf-s": (year, code) =>
+    `rgf?an_exercicio=${year}&in_periodicidade=S&nr_periodo=2&co_tipo_demonstrativo=RGF&no_anexo=RGF-Anexo%2001&co_esfera=${esfera(code)}&co_poder=E&id_ente=${code}`,
 };
+
+// `--refresh` re-downloads the two most recent years, which municipalities may still rectify.
+const REFRESH_FROM = process.argv.includes("--refresh") ? YEARS[YEARS.length - 2] : Infinity;
 
 async function fetchCached(kind: Kind, year: number, code: string): Promise<Item[]> {
   const file = path.join(RAW_DIR, `${kind}-${year}-${code}.json`);
-  try {
-    return JSON.parse(await readFile(file, "utf8"));
-  } catch {
-    // not cached yet
+  if (year < REFRESH_FROM) {
+    try {
+      return JSON.parse(await readFile(file, "utf8"));
+    } catch {
+      // not cached yet
+    }
   }
 
   const url = `${API_URL}/${QUERIES[kind](year, code)}`;
@@ -151,6 +166,51 @@ function parseRevenue(items: Item[], code: string, year: number, warnings: strin
   return { total: round(total), sources };
 }
 
+// Legal minimums and limits, as declared by each entity.
+type LegalItem = { applied: number; minimum: number } | null;
+type Legal = {
+  education: LegalItem; // MDE, % of tax revenue (minimum 25%)
+  health: LegalItem; // ASPS, % of tax revenue (minimum 15% municipalities, 12% states)
+  fundebPay: LegalItem; // % of FUNDEB on education professionals' pay (minimum 70%)
+  personnel: { percent: number; limit: number; prudential: number; alert: number; period: string } | null;
+};
+
+function parseSimplified(items: Item[]) {
+  const pick = (codConta: string): LegalItem => {
+    const rows = items.filter((i) => i.cod_conta === codConta);
+    const applied = rows.find((r) => r.coluna.startsWith("% Aplicado"))?.valor;
+    const minimum = rows.find((r) => r.coluna.startsWith("% Mínimo"))?.valor;
+    return applied == null || minimum == null ? null : { applied, minimum };
+  };
+  return {
+    education: pick("MinimoAnualDasReceitasDeImpostosNaManutencaoEDesenvolvimentoDoEnsinoDemonstrativoSimplificado"),
+    health: pick("AplicacaoTotalDasDespesasComAcoesEServicosPublicosDeSaude"),
+    fundebPay: pick("MinimoAnualDoFUNDEBNaRemuneracaoDoMagisterioComEducacaoInfantilEnsinoFundamentalEMedioDemonstrativoSimplificado"),
+  };
+}
+
+function parsePersonnel(items: Item[], period: string): Legal["personnel"] {
+  const pct = (codConta: string) =>
+    items.find((i) => i.cod_conta === codConta && i.coluna.startsWith("% sobre"))?.valor;
+  const percent = pct("DespesaComPessoalTotal");
+  const limit = pct("LimiteMaximoDespesaComPessoalTotal");
+  if (percent == null || limit == null) return null;
+  return {
+    percent,
+    limit,
+    prudential: pct("LimitePrudencialDespesaComPessoalTotal") ?? limit * 0.95,
+    alert: pct("LimiteDeAlertaDespesaComPessoalTotal") ?? limit * 0.9,
+    period,
+  };
+}
+
+async function fetchLegal(code: string, year: number): Promise<Legal> {
+  const simplified = parseSimplified(await fetchCached("rreo-simplificado", year, code));
+  let personnel = parsePersonnel(await fetchCached("rgf-q", year, code), "3º quadrimestre");
+  if (!personnel) personnel = parsePersonnel(await fetchCached("rgf-s", year, code), "2º semestre");
+  return { ...simplified, personnel };
+}
+
 const RREO_COLUMNS = {
   planned: "DOTAÇÃO INICIAL",
   authorized: "DOTAÇÃO ATUALIZADA (a)",
@@ -186,6 +246,7 @@ async function buildEntityYear(code: string, year: number, warnings: string[]): 
   const dca = parseDca(dcaItems);
   const rreo = parseRreo(rreoItems);
   const revenue = parseRevenue(revenueItems, code, year, warnings);
+  const legal = await fetchLegal(code, year);
 
   if (rreo) {
     const sum = Object.values(rreo.byFunction).reduce((a, f) => a + (f.planned ?? 0), 0);
@@ -216,6 +277,7 @@ async function buildEntityYear(code: string, year: number, warnings: string[]): 
     paid: dca ? round(dca.paid) : null,
     byFunction,
     revenue,
+    legal,
   };
 }
 
@@ -286,6 +348,13 @@ async function main() {
     );
   }
   for (const w of warnings) console.warn(`WARN ${w}`);
+  for (const year of YEARS) {
+    const noLegal = codes.filter((c) => !entities[c][year].legal.education && !entities[c][year].legal.personnel);
+    if (noLegal.length) console.log(`${year}: no legal indicators for ${noLegal.length} entities`);
+  }
+
+  const outFile = path.join(ROOT, "data", "budget.json");
+  await recordChanges(outFile, entities, names);
 
   const output = {
     metadata: {
@@ -294,6 +363,9 @@ async function main() {
           "Tesouro Nacional – SICONFI, Relatório Resumido da Execução Orçamentária (RREO), Anexo 02, 6º bimestre",
         paid: "Tesouro Nacional – SICONFI, Declaração de Contas Anuais (DCA), Anexo I-E",
         revenue: "Tesouro Nacional – SICONFI, Declaração de Contas Anuais (DCA), Anexo I-C",
+        legalMinimums:
+          "Tesouro Nacional – SICONFI, RREO Anexo 14 (Demonstrativo Simplificado), 6º bimestre, valores declarados pelo ente",
+        personnel: "Tesouro Nacional – SICONFI, Relatório de Gestão Fiscal (RGF) Anexo 01, Poder Executivo, último período do ano",
         territories: territories.source,
       },
       urls: { siconfi: API_URL, territories: territories.url },
@@ -305,9 +377,67 @@ async function main() {
     entities,
   };
 
-  const outFile = path.join(ROOT, "data", "budget.json");
   await writeFile(outFile, JSON.stringify(output));
   console.log(`Saved to ${outFile}`);
+}
+
+type Change = { code: string; name: string; year: number; field: string; before: number | null; after: number | null };
+
+/**
+ * Compares the new data with the previous data/budget.json and appends any
+ * differences (usually rectified reports) to data/changelog.json.
+ */
+async function recordChanges(
+  outFile: string,
+  entities: Record<string, Record<string, EntityYear>>,
+  names: Map<string, string>,
+) {
+  let previous: { entities: Record<string, Record<string, EntityYear>> } | null = null;
+  try {
+    previous = JSON.parse(await readFile(outFile, "utf8"));
+  } catch {
+    return; // first run
+  }
+
+  const fields: [string, (e: EntityYear) => number | null][] = [
+    ["Orçamento previsto", (e) => e.planned],
+    ["Gasto pago", (e) => e.paid],
+    ["Receita", (e) => e.revenue?.total ?? null],
+  ];
+  const changes: Change[] = [];
+  for (const [code, years] of Object.entries(entities)) {
+    for (const [year, now] of Object.entries(years)) {
+      const before = previous!.entities[code]?.[year];
+      if (!before) continue;
+      for (const [field, pick] of fields) {
+        const a = pick(before);
+        const b = pick(now);
+        // Ignore rounding noise below R$ 1.000
+        if (a !== b && (a == null || b == null || Math.abs(a - b) >= 1000)) {
+          changes.push({
+            code,
+            name: code === STATE_CODE ? "Governo do Estado" : names.get(code)!,
+            year: Number(year),
+            field,
+            before: a,
+            after: b,
+          });
+        }
+      }
+    }
+  }
+  if (!changes.length) return;
+
+  const logFile = path.join(ROOT, "data", "changelog.json");
+  let log: { date: string; changes: Change[] }[] = [];
+  try {
+    log = JSON.parse(await readFile(logFile, "utf8"));
+  } catch {
+    // no log yet
+  }
+  log.unshift({ date: new Date().toISOString().slice(0, 10), changes });
+  await writeFile(logFile, JSON.stringify(log, null, 2));
+  console.log(`Recorded ${changes.length} changes in ${logFile}`);
 }
 
 main().catch((err) => {
