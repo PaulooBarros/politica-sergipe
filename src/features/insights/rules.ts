@@ -1,5 +1,6 @@
 import { FUNCTIONS, getEntityYear, STATE_CODE } from "@/features/budget/data";
 import { getMunicipalityRows, median, ratio } from "@/features/budget/metrics";
+import { getLegalChecks } from "@/features/legal/checks";
 import { getMunicipalityByCode } from "@/features/municipalities/registry";
 import { formatBRL, formatBRLShort, formatPercent } from "@/lib/format";
 
@@ -18,11 +19,15 @@ export type Insight = {
   why: string;
   explanations: string[];
   check: string[];
+  /** A neutral question a citizen can send to the legislature or file as an information request. */
+  question: string;
   /** Used to order insights of the same rule (bigger = more unusual). */
   magnitude: number;
 };
 
 export type RuleId =
+  | "legal-minimum"
+  | "personnel-limit"
   | "budget-revised"
   | "low-execution"
   | "royalty-dependence"
@@ -32,20 +37,66 @@ export type RuleId =
   | "area-above-peers"
   | "high-spending-per-capita";
 
-export const RULES: Record<RuleId, { label: string; threshold: string }> = {
-  "budget-revised": { label: "Gasto muito acima do orçamento aprovado", threshold: "pago ≥ 125% do previsto na lei" },
-  "low-execution": { label: "Orçamento pouco executado", threshold: "pago < 75% do autorizado" },
-  "royalty-dependence": { label: "Receita dependente de royalties", threshold: "royalties ≥ 15% da receita" },
-  "spending-jump": { label: "Salto no gasto de um ano para o outro", threshold: "gasto pago cresceu ≥ 35%" },
-  loans: { label: "Receita com peso de empréstimos", threshold: "empréstimos ≥ 5% da receita" },
-  "spent-above-revenue": { label: "Gastou mais do que arrecadou", threshold: "pago > 103% da receita do ano" },
+type Rule = { label: string; threshold: string; question: (year: number, title: string) => string };
+
+export const RULES: Record<RuleId, Rule> = {
+  "legal-minimum": {
+    label: "Mínimo constitucional não atingido",
+    threshold: "% declarado abaixo do mínimo de educação, saúde ou Fundeb",
+    question: (y, t) =>
+      `Por que o mínimo legal (${t.replace("Mínimo não atingido: ", "")}) não foi atingido em ${y}? Como e quando a diferença será compensada?`,
+  },
+  "personnel-limit": {
+    label: "Gasto com pessoal acima do limite de alerta",
+    threshold: "gasto com pessoal > 90% do limite da LRF",
+    question: (y) =>
+      `Quais medidas estão sendo adotadas para manter o gasto com pessoal dentro dos limites da Lei de Responsabilidade Fiscal, considerando o resultado de ${y}?`,
+  },
+  "budget-revised": {
+    label: "Gasto muito acima do orçamento aprovado",
+    threshold: "pago ≥ 125% do previsto na lei",
+    question: (y) =>
+      `Quais leis e decretos de crédito adicional ampliaram o orçamento de ${y}, com qual fonte de recursos e em quais áreas o valor adicional foi aplicado?`,
+  },
+  "low-execution": {
+    label: "Orçamento pouco executado",
+    threshold: "pago < 75% do autorizado",
+    question: (y) =>
+      `Quais obras, serviços e programas previstos no orçamento de ${y} não foram pagos no ano, e qual o motivo?`,
+  },
+  "royalty-dependence": {
+    label: "Receita dependente de royalties",
+    threshold: "royalties ≥ 15% da receita",
+    question: (y) =>
+      `Em quais despesas foram aplicados os royalties recebidos em ${y}? Existe planejamento para o caso de essa receita diminuir?`,
+  },
+  "spending-jump": {
+    label: "Salto no gasto de um ano para o outro",
+    threshold: "gasto pago cresceu ≥ 35%",
+    question: (y) => `Quais despesas mais cresceram em ${y} em relação ao ano anterior, e o que explica o aumento?`,
+  },
+  loans: {
+    label: "Receita com peso de empréstimos",
+    threshold: "empréstimos ≥ 5% da receita",
+    question: (y) =>
+      `Quais operações de crédito foram contratadas até ${y}, para quais finalidades, com quais juros, prazos e parcelas previstas?`,
+  },
+  "spent-above-revenue": {
+    label: "Gastou mais do que arrecadou",
+    threshold: "pago > 103% da receita do ano",
+    question: (y) =>
+      `De onde vieram os recursos para pagar despesas acima da receita de ${y}? Qual era o saldo em caixa no início e no fim do ano?`,
+  },
   "area-above-peers": {
     label: "Área com gasto muito acima dos municípios do mesmo porte",
     threshold: "≥ 3× a mediana do porte, em áreas com ≥ 8% do gasto (exceto Previdência)",
+    question: (y, t) =>
+      `Quais foram as principais despesas na área ${t.split(":")[0]} em ${y}, com os respectivos credores, contratos e objetos?`,
   },
   "high-spending-per-capita": {
     label: "Gasto por habitante muito acima do mesmo porte",
     threshold: "≥ 1,5× a mediana do porte",
+    question: (y) => `Quais foram as 20 maiores despesas de ${y}, com credor, contrato e objeto de cada uma?`,
   },
 };
 
@@ -76,7 +127,42 @@ export function getInsights(entityCode: string, year: number): Insight[] {
   const who = isState ? "O Governo do Estado" : "A prefeitura";
   const { legislature, transparency } = oversight(isState);
   const insights: Insight[] = [];
-  const add = (i: Omit<Insight, "entityCode" | "year">) => insights.push({ ...i, entityCode, year });
+  const add = (i: Omit<Insight, "entityCode" | "year" | "question">) =>
+    insights.push({ ...i, entityCode, year, question: RULES[i.rule].question(year, i.title) });
+
+  // 0. Legal obligations (as declared by the entity itself)
+  for (const c of getLegalChecks(entityCode, year)) {
+    if (c.id !== "personnel" && c.status === "fail") {
+      add({
+        rule: "legal-minimum",
+        title: `Mínimo não atingido: ${c.label.toLowerCase()}`,
+        fact: c.sentence,
+        why: "Os mínimos de educação, saúde e Fundeb são obrigações da Constituição e de leis federais. Não cumpri-los pode levar à rejeição das contas e à suspensão de transferências.",
+        explanations: [
+          "Diferença compensada no ano seguinte, como a lei às vezes permite.",
+          "Erro de preenchimento no relatório, corrigido depois (retificação).",
+          "Receita maior que a prevista no fim do ano, elevando o valor mínimo exigido.",
+        ],
+        check: [TCE, isState ? "SIOPE e SIOPS (sistemas federais de educação e saúde)" : "SIOPE (educação) e SIOPS (saúde), sistemas federais onde o município declara esses gastos"],
+        magnitude: 1 + (c.threshold! - c.value!) / c.threshold!,
+      });
+    }
+    if (c.id === "personnel" && (c.status === "alert" || c.status === "prudential" || c.status === "fail")) {
+      add({
+        rule: "personnel-limit",
+        title: c.status === "fail" ? "Gasto com pessoal acima do limite da LRF" : "Gasto com pessoal perto do limite da LRF",
+        fact: c.sentence,
+        why: "Acima do limite prudencial, a lei proíbe novas contratações e reajustes; acima do máximo, o excesso precisa ser eliminado em até dois quadrimestres, sob pena de sanções.",
+        explanations: [
+          "Queda da receita corrente líquida, que reduz o limite em reais.",
+          "Reajustes do piso nacional (magistério, enfermagem) e novas contratações.",
+          "Diferença de método: o percentual é o declarado pelo próprio ente, e o TCE-SE pode chegar a outro valor ao analisar as contas.",
+        ],
+        check: [transparency, TCE],
+        magnitude: c.value! / c.threshold!,
+      });
+    }
+  }
 
   const { paid, planned, authorized, revenue } = entity;
 
@@ -227,6 +313,7 @@ function getPeerInsights(code: string, year: number): Insight[] {
         "População subestimada na base usada pelo Tesouro.",
       ],
       check: [transparency, TCE],
+      question: RULES["high-spending-per-capita"].question(year, ""),
       magnitude: spendRatio,
     });
   }
@@ -260,6 +347,7 @@ function getPeerInsights(code: string, year: number): Insight[] {
         "Investimento pontual concentrado no ano.",
       ],
       check: [`${transparency}: filtrar a função ${name}`, TCE],
+      question: RULES["area-above-peers"].question(year, `${name}:`),
       magnitude: a.r!,
     });
   }
