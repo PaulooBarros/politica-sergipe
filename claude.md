@@ -47,27 +47,35 @@ Seções do portal:
 - `scripts/`: pré-processamento de dados (rodar uma vez; resultado vai para `data/`). Respostas brutas das APIs ficam em cache em `data/raw/` (fora do git).
 - `data/`: JSON estático gerado pelos scripts, versionado. `data/sources/` guarda listas mantidas à mão, sempre com a fonte.
 - `src/app/`: rotas. Cada `page.tsx` só busca dados e monta componentes.
-  - `/`: panorama de Sergipe (números do estado, mapa por indicador, territórios).
-  - `/municipios`: lista com filtros (ano, território, porte, área, busca) e ordenação, via parâmetros de URL.
-  - `/municipios/[slug]`: página do município (`?ano=`, `?area=`).
-  - `/estado`: orçamento do Governo do Estado.
-  - `/sobre`: fontes, metodologia e glossário.
-  - `/eleicoes`, `/quiz`: seções futuras.
-- `src/features/<funcionalidade>/`: dados, cálculos e componentes de uma funcionalidade (`budget/`, `insights/`, `municipalities/`, `map/`; depois `elections/`, `quiz/`).
-  - `features/insights/rules.ts`: regras dos pontos de atenção. Limites ficam em `RULES` e são exibidos em `/sobre#criterios`; ao mudar um limite, conferir quantos municípios são acionados (hoje ~21 de 75 em 2025).
+  - `/`: mapa em destaque com ficha lateral (gaveta inferior no celular), números do estado, destaques dos pontos de atenção, obrigações legais, territórios e Estado.
+  - `/municipios`: lista com filtros (ano, território, porte, área, pontos de atenção, busca) e ordenação, via parâmetros de URL.
+  - `/municipios/[slug]`: raio-x do município (`?ano=`, `?area=`, `?inflacao=nao`) e `opengraph-image` (cartão para WhatsApp).
+  - `/[slug]`: link curto, redireciona para `/municipios/[slug]` (ex.: `/aracaju`).
+  - `/comparar?a=&b=&ano=`: dois municípios lado a lado.
+  - `/estado`: raio-x do Governo do Estado.
+  - `/participe`: calendário do orçamento, quem fiscaliza e gerador de pedido pela LAI (`?municipio=&pergunta=`).
+  - `/sobre`: glossário, fontes, metodologia, critérios e histórico de atualizações.
+  - `/dados/municipios?ano=` e `/dados/[slug]` (ou `/dados/estado`): CSV com `;` e vírgula decimal (Excel pt-BR).
+  - `/eleicoes`, `/quiz`: seções futuras (links só no rodapé).
+- `src/features/<funcionalidade>/`: dados, cálculos e componentes de uma funcionalidade (`budget/`, `insights/`, `legal/`, `municipalities/`, `map/`, `participation/`; depois `elections/`, `quiz/`).
+  - `features/insights/rules.ts`: regras dos pontos de atenção, cada uma com pergunta pronta para o cidadão. Limites ficam em `RULES` e são exibidos em `/sobre#criterios`; ao mudar um limite, conferir quantos municípios são acionados.
+  - `features/legal/checks.ts`: mínimos de educação/saúde/Fundeb e limite de pessoal (valores declarados pelo ente).
+  - `features/budget/sources.ts`: links diretos para as consultas do SICONFI de cada ente/ano.
 - Comparações usam **mediana** (não média): de Sergipe, do território e do mesmo porte.
-- Páginas de município e do Estado são "raio-x" em capítulos numerados: Resumo, Pontos de atenção, De onde vem o dinheiro, Para onde vai, Comparação, Evolução.
-- `src/components/ui/`: peças de interface compartilhadas (cartões, seções, nota de fonte, filtros).
+- Evolução: por padrão em reais do ano-base do IPCA (`data/ipca.json`).
+- Páginas de município e do Estado são "raio-x" em capítulos numerados: Resumo (com compartilhar), Obrigações legais, Pontos de atenção, De onde vem, Para onde vai (com "de cada R$ 100"), Comparação, Evolução, Dados e fontes.
+- `src/components/ui/`: peças compartilhadas (cartões, seções, tabelas, filtros, `Term` para glossário inline, compartilhar, copiar).
 - `src/components/charts/`: gráficos SVG/HTML próprios.
 - `src/components/layout/`: cabeçalho, navegação e rodapé.
-- `src/lib/`: utilitários compartilhados (formatação pt-BR, slugs).
+- `src/lib/`: utilitários (formatação pt-BR, slugs, CSV, glossário).
 - `tests/`: testes Playwright.
 
 ## Comandos
 
 - `npm run dev`: servidor de desenvolvimento em http://localhost:3000
 - `npm run data:map`: baixa de novo a malha e os nomes dos municípios do IBGE
-- `npm run data:budget`: baixa de novo o orçamento (SICONFI, 2021 a 2025, 75 municípios + Governo do Estado; usa cache em `data/raw/`, então só a primeira execução é lenta)
+- `npm run data:budget`: baixa de novo o orçamento (SICONFI, 2021 a 2025, 75 municípios + Governo do Estado; usa cache em `data/raw/`, então só a primeira execução é lenta). Com `-- --refresh`, ignora o cache dos dois anos mais recentes para pegar retificações; diferenças vão para `data/changelog.json`.
+- `npm run data:ipca`: baixa o IPCA do IBGE (SIDRA 1737) e grava os fatores de correção em `data/ipca.json`
 - `npm run test:e2e`: build de produção e testes Playwright
 
 ## Como trabalhar neste projeto
@@ -87,10 +95,13 @@ Seções do portal:
   - `rreo`, Anexo 02, 6º bimestre: **orçamento previsto** (dotação inicial), **orçamento atualizado** (dotação atualizada), empenhado e liquidado, por função.
   - `dca`, Anexo I-E: **valor pago** por função e população do exercício.
   - `dca`, Anexo I-C: **receita** por origem (impostos próprios, FPM/FPE, cota de ICMS/IPVA, royalties, Fundeb, SUS, empréstimos, outras), líquida de deduções (Fundeb e, no Estado, a cota municipal). Total = linha `ReceitasExcetoIntraOrcamentarias`.
+  - `rreo`, Anexo 14 (simplificado), 6º bimestre: % aplicado em educação (MDE), saúde (ASPS) e Fundeb na remuneração, com o mínimo de cada um. Os Anexos 08 e 12 não estão na API para municípios.
+  - `rgf`, Anexo 01, Poder Executivo, 3º quadrimestre (ou 2º semestre para quem publica semestralmente): gasto com pessoal em % da RCL ajustada e limites (máximo, prudencial, alerta). Em 2025, 44 dos 75 municípios declararam estar acima do limite de 54%.
   - Sempre sem despesas intraorçamentárias. No RREO, as linhas de função são as de `cod_conta = RREO2TotalDespesas` cujo nome bate com a classificação funcional (Portaria MOG 42/1999).
   - Atenção: a população da base muda de critério entre anos (ex.: Aracaju 672 mil em 2023 e 605 mil em 2024, após o Censo), o que afeta a comparação por habitante entre anos.
 - **Territórios de planejamento:** 8 territórios definidos pelo Decreto estadual nº 24.338/2007. Lista de municípios em `data/sources/territorios.json`, transcrita da reportagem "Sergipe: saiba mais sobre os oito territórios do Estado" (A8 Sergipe, republicando o Governo de Sergipe). **Confirmar com documento oficial** (Seplag/Observatório de Sergipe) quando possível; a página do governo não abriu na VPN.
 - **Porte populacional:** faixas calculadas com a população do SICONFI do ano exibido.
+- **Inflação:** ✅ IPCA, IBGE/SIDRA tabela 1737 (número-índice mensal); fator anual pela média do índice.
 - **Eleições:** portal de dados abertos do TSE (resultados por município e cargo). Bloqueado na VPN corporativa.
 - **Quiz:** conteúdo próprio, baseado em constituições, regimentos e sites oficiais (Assembleia Legislativa, TSE, TCE-SE), sempre com a fonte da resposta.
 
