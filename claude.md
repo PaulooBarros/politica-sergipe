@@ -144,6 +144,6 @@ Entregas, cada uma funcionando ao fim:
 
 - [x] Etapa 1: Base e mapa (malha IBGE 2022, 75 municípios clicáveis, 3 testes Playwright)
 - [ ] Etapa 2: Eleições. **Pendente:** os sites do TSE (CDN, dados abertos e API de resultados) retornam 403 na VPN corporativa. Retomar fora da VPN, baixando `votacao_candidato_munzona_2022.zip` para `data/raw/`. Plano já definido: ligar código TSE ao IBGE pelo nome normalizado (falhar se algum dos 75 não casar); percentual sobre votos nominais.
-- [ ] Etapa 3: Portal do orçamento. Feito: rotas do portal, receita por origem, pontos de atenção, raio-x do município e do Estado, lista com filtros, panorama com destaques, glossário e critérios. **Pendente:** reescrever os testes Playwright para a nova estrutura (os de `tests/` estão desatualizados) e revisão visual com o dono do projeto.
+- [ ] Etapa 3: Portal do orçamento. Feito: rotas do portal, receita por origem, pontos de atenção, raio-x do município e do Estado, lista com filtros, panorama com destaques, glossário e critérios. Redesenho visual aplicado (Source Serif 4 em títulos e números, cabeçalho em duas faixas, capítulos com título que resume o dado, gráficos novos em `components/charts/`: ThresholdBar, StripPlot, RangeDots, Waffle, BarList, StackedBar). **Pendente:** reescrever os testes Playwright para a nova estrutura (os de `tests/` estão desatualizados) e revisão visual com o dono do projeto.
 - [ ] Etapa 4: Quiz cívico
 - [ ] Etapa 5: Extras
