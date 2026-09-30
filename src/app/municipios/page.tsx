@@ -1,36 +1,76 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ProgressBar from "@/components/charts/ProgressBar";
+import CollapsibleFilters from "@/components/ui/CollapsibleFilters";
 import { DataTable, Td, Th } from "@/components/ui/DataTable";
 import FilterForm from "@/components/ui/FilterForm";
+import { DownloadIcon, SearchIcon } from "@/components/ui/Icons";
+import NotDeclared from "@/components/ui/NotDeclared";
 import PageHeader from "@/components/ui/PageHeader";
+import { SegmentedRadio } from "@/components/ui/Segmented";
 import SelectField from "@/components/ui/SelectField";
-import BudgetSource from "@/features/budget/components/BudgetSource";
+import SourceNote from "@/components/ui/SourceNote";
 import { FUNCTIONS, parseArea, parseYear } from "@/features/budget/data";
 import { getMunicipalityRows, medianPerCapita, type MunicipalityRow } from "@/features/budget/metrics";
 import { areaOptions, yearOptions } from "@/features/budget/options";
 import { getInsights } from "@/features/insights/rules";
+import { getLegalChecks } from "@/features/legal/checks";
 import { SIZE_CLASSES, TERRITORIES } from "@/features/municipalities/registry";
-import { formatBRL, formatInteger, formatPercent } from "@/lib/format";
+import { formatBRL, formatBRLCompact, formatInteger, formatPercent, formatPoints } from "@/lib/format";
 import { slugify } from "@/lib/slug";
 
 export const metadata: Metadata = { title: "Municípios" };
 
-type Row = MunicipalityRow & { insightCount: number };
+type Row = MunicipalityRow & { insightCount: number; personnel: number | null; personnelOver: boolean };
 
-const desc = (pick: (r: Row) => number | null) => (a: Row, b: Row) => (pick(b) ?? -1) - (pick(a) ?? -1);
-
-const SORTS = {
-  nome: { label: "Município", align: "left", compare: (a: Row, b: Row) => a.name.localeCompare(b.name, "pt-BR") },
-  populacao: { label: "População", align: "right", compare: desc((r) => r.population) },
-  receita: { label: "Receita/hab.", align: "right", compare: desc((r) => r.revenuePerCapita) },
-  gasto: { label: "Gasto/hab.", align: "right", compare: desc((r) => r.paidPerCapita) },
-  execucao: { label: "Executado", align: "right", compare: desc((r) => r.execution) },
-  atencao: { label: "Pontos de atenção", align: "right", compare: desc((r) => r.insightCount) },
-} as const;
+const SORTS: Record<string, { label: string; pick: ((r: Row) => number | null) | null; firstDir: "asc" | "desc" }> = {
+  nome: { label: "Município", pick: null, firstDir: "asc" },
+  populacao: { label: "População", pick: (r) => r.population, firstDir: "desc" },
+  pago: { label: "Gasto pago", pick: (r) => r.paid, firstDir: "desc" },
+  gasto: { label: "Por habitante", pick: (r) => r.paidPerCapita, firstDir: "desc" },
+  receita: { label: "Receita/hab.", pick: (r) => r.revenuePerCapita, firstDir: "desc" },
+  execucao: { label: "Executado", pick: (r) => r.execution, firstDir: "desc" },
+  pessoal: { label: "Pessoal", pick: (r) => r.personnel, firstDir: "desc" },
+  atencao: { label: "Atenção", pick: (r) => (r.paid == null ? null : r.insightCount), firstDir: "desc" },
+};
 type SortKey = keyof typeof SORTS;
 
+/** Sorts by the chosen column; missing values always go last, whatever the direction. */
+function sortRows(rows: Row[], key: SortKey, dir: string) {
+  const sign = dir === "asc" ? 1 : -1;
+  const pick = SORTS[key].pick;
+  return [...rows].sort((a, b) => {
+    if (!pick) return sign * a.name.localeCompare(b.name, "pt-BR");
+    const va = pick(a);
+    const vb = pick(b);
+    if (va == null) return vb == null ? 0 : 1;
+    if (vb == null) return -1;
+    return sign * (va - vb) || a.name.localeCompare(b.name, "pt-BR");
+  });
+}
+
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+
+function AttentionTag({ row }: { row: Row }) {
+  if (row.paid == null) return <NotDeclared label="não declarou" />;
+  if (row.insightCount === 0) return <span className="text-[13px] text-ink-500">Nenhum</span>;
+  return (
+    <span className="rounded border border-alert-200 bg-alert-50 px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap text-alert-800">
+      <span aria-hidden className="text-[10px] text-alert-500">▲</span> {row.insightCount}
+      <span className="sr-only"> {row.insightCount === 1 ? "ponto" : "pontos"} de atenção</span>
+    </span>
+  );
+}
+
+function Personnel({ row }: { row: Row }) {
+  if (row.personnel == null) return <span className="text-sm text-ink-500 italic">não declarado</span>;
+  return (
+    <span className={row.personnelOver ? "font-semibold text-alert-800" : undefined}>
+      {row.personnelOver && <span aria-hidden className="mr-1 text-[10px] text-alert-500">▲</span>}
+      {formatPoints(row.personnel)}
+    </span>
+  );
+}
 
 export default async function MunicipalitiesPage({ searchParams }: PageProps<"/municipios">) {
   const query = await searchParams;
@@ -39,189 +79,276 @@ export default async function MunicipalitiesPage({ searchParams }: PageProps<"/m
   const territorySlug = first(query.territorio);
   const territory = TERRITORIES.find((t) => slugify(t) === territorySlug) ?? null;
   const size = SIZE_CLASSES.find((c) => c.id === first(query.porte)) ?? null;
-  const onlyFlagged = first(query.atencao) === "sim";
+  const attention = ["sim", "nao"].includes(first(query.atencao)) ? first(query.atencao) : "";
   const search = first(query.q).trim();
-  const sortKey: SortKey = first(query.ordem) in SORTS ? (first(query.ordem) as SortKey) : "nome";
+  const sortKey: SortKey = Object.hasOwn(SORTS, first(query.ordem)) ? first(query.ordem) : "nome";
+  const dir = first(query.dir) === "asc" || first(query.dir) === "desc" ? first(query.dir) : SORTS[sortKey].firstDir;
 
   const normalizedSearch = slugify(search);
-  const allRows: Row[] = getMunicipalityRows(year, area).map((r) => ({
-    ...r,
-    // Revenue is not split by area, so it only makes sense for the whole budget.
-    revenuePerCapita: area ? null : r.revenuePerCapita,
-    insightCount: getInsights(r.code, year).length,
-  }));
-  const rows = allRows
+  const allRows: Row[] = getMunicipalityRows(year, area).map((r) => {
+    const personnel = getLegalChecks(r.code, year).find((c) => c.id === "personnel");
+    return {
+      ...r,
+      // Revenue is not split by area, so it only makes sense for the whole budget.
+      revenuePerCapita: area ? null : r.revenuePerCapita,
+      insightCount: getInsights(r.code, year).length,
+      personnel: personnel?.value ?? null,
+      personnelOver: personnel?.status === "fail",
+    };
+  });
+  const filtered = allRows
     .filter((r) => !territory || r.territory === territory)
     .filter((r) => !size || r.sizeClass?.id === size.id)
-    .filter((r) => !onlyFlagged || r.insightCount > 0)
-    .filter((r) => !normalizedSearch || r.slug.includes(normalizedSearch))
-    .sort(SORTS[sortKey].compare);
+    .filter((r) => (attention === "sim" ? r.insightCount > 0 : attention === "nao" ? r.insightCount === 0 && r.paid != null : true))
+    .filter((r) => !normalizedSearch || r.slug.includes(normalizedSearch));
+  const rows = sortRows(filtered, sortKey, dir);
 
   const stateMedian = medianPerCapita(allRows);
   const areaLabel = area ? FUNCTIONS[area] : null;
 
-  const params = {
+  const params: Record<string, string> = {
     ano: String(year),
     area: area ?? "",
     territorio: territory ? territorySlug : "",
     porte: size?.id ?? "",
-    atencao: onlyFlagged ? "sim" : "",
+    atencao: attention,
     q: search,
   };
+  const hrefWith = (changes: Record<string, string>) =>
+    `/municipios?${new URLSearchParams(Object.entries({ ...params, ordem: sortKey, dir, ...changes }).filter(([, v]) => v))}`;
   const sortHref = (key: SortKey) =>
-    `/municipios?${new URLSearchParams(Object.entries({ ...params, ordem: key }).filter(([, v]) => v))}`;
-  const hasFilters = Boolean(area || territory || size || search || onlyFlagged);
+    hrefWith({ ordem: key, dir: key === sortKey ? (dir === "asc" ? "desc" : "asc") : SORTS[key].firstDir });
+
+  const chips = [
+    search && { label: `“${search}”`, href: hrefWith({ q: "" }) },
+    territory && { label: territory, href: hrefWith({ territorio: "" }) },
+    size && { label: size.label, href: hrefWith({ porte: "" }) },
+    areaLabel && { label: `Área: ${areaLabel}`, href: hrefWith({ area: "" }) },
+    attention && { label: attention === "sim" ? "Com pontos de atenção" : "Sem pontos de atenção", href: hrefWith({ atencao: "" }) },
+  ].filter((c): c is { label: string; href: string } => Boolean(c));
+
+  const columns: SortKey[] = ["nome", "populacao", "pago", "gasto", ...(area ? [] : (["receita"] as SortKey[])), "execucao", "pessoal", "atencao"];
 
   return (
     <>
       <PageHeader
-        eyebrow="Os 75 municípios"
-        title="Compare os municípios"
+        breadcrumb={[{ label: "Início", href: "/" }, { label: "Municípios" }]}
+        title="Os 75 municípios de Sergipe"
         description={
           <p>
-            Receita, gasto, execução do orçamento e pontos de atenção de cada prefeitura. Filtre por território, porte ou
-            área e ordene por qualquer coluna.
+            Filtre, ordene e compare. Clique no nome para abrir o raio-x completo. A ordem padrão é alfabética: o portal não
+            faz ranking de &ldquo;melhores&rdquo; ou &ldquo;piores&rdquo;.
           </p>
         }
       />
 
-      <FilterForm className="grid gap-4 rounded-lg border border-paper-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-6">
-        <input type="hidden" name="ordem" value={sortKey} />
-        <SelectField name="ano" label="Ano" value={String(year)} options={yearOptions()} />
-        <SelectField
-          name="territorio"
-          label="Território"
-          value={territory ? territorySlug : ""}
-          options={[{ value: "", label: "Todos" }, ...TERRITORIES.map((t) => ({ value: slugify(t), label: t }))]}
-        />
-        <SelectField
-          name="porte"
-          label="Porte"
-          value={size?.id ?? ""}
-          options={[{ value: "", label: "Todos" }, ...SIZE_CLASSES.map((c) => ({ value: c.id, label: c.label }))]}
-        />
-        <SelectField name="area" label="Área de gasto" value={area ?? ""} options={areaOptions("Orçamento inteiro")} />
-        <SelectField
-          name="atencao"
-          label="Pontos de atenção"
-          value={onlyFlagged ? "sim" : ""}
-          options={[
-            { value: "", label: "Todos os municípios" },
-            { value: "sim", label: "Só com pontos de atenção" },
-          ]}
-        />
-        <label className="flex flex-col gap-1 text-sm text-ink-700">
-          <span className="font-medium">Buscar por nome</span>
-          <span className="flex gap-2">
-            <input
-              type="search"
-              name="q"
-              defaultValue={search}
-              key={search}
-              placeholder="Ex.: Lagarto"
-              className="w-full min-w-0 rounded-sm border border-paper-300 bg-paper-50 px-3 py-2 text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+      <div className="page flex flex-col gap-4 pt-6">
+        <CollapsibleFilters activeCount={chips.length}>
+          <FilterForm action="/municipios" className="card grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+            <input type="hidden" name="ordem" value={sortKey} />
+            <input type="hidden" name="dir" value={dir} />
+            <label className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
+              <span className="text-[13px] font-semibold text-ink-700">Buscar pelo nome</span>
+              <span className="flex gap-2">
+                <input type="search" name="q" defaultValue={search} key={search} placeholder="Ex.: Lagarto" className="field min-w-0" />
+                <button type="submit" className="btn btn-primary px-3.5" aria-label="Buscar">
+                  <SearchIcon />
+                </button>
+              </span>
+            </label>
+            <SelectField name="ano" label="Ano" value={String(year)} options={yearOptions()} />
+            <SelectField
+              name="territorio"
+              label="Território"
+              value={territory ? territorySlug : ""}
+              options={[{ value: "", label: "Todos os territórios" }, ...TERRITORIES.map((t) => ({ value: slugify(t), label: t }))]}
             />
-            <button type="submit" className="rounded-md bg-brand-700 px-3 py-2 font-medium text-white hover:bg-brand-800">
-              Buscar
-            </button>
-          </span>
-        </label>
-      </FilterForm>
+            <SelectField
+              name="porte"
+              label="Porte (habitantes)"
+              value={size?.id ?? ""}
+              options={[{ value: "", label: "Todos os portes" }, ...SIZE_CLASSES.map((c) => ({ value: c.id, label: c.label }))]}
+            />
+            <SelectField name="area" label="Área de gasto" value={area ?? ""} options={areaOptions("Orçamento inteiro")} />
+            <SegmentedRadio
+              name="atencao"
+              label="Pontos de atenção"
+              value={attention}
+              className="sm:col-span-2"
+              options={[
+                { value: "", label: "Todos" },
+                { value: "sim", label: "Com pontos" },
+                { value: "nao", label: "Sem pontos" },
+              ]}
+            />
+          </FilterForm>
+        </CollapsibleFilters>
 
-      <div className="mt-6 mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <p className="text-ink-700" data-testid="result-count">
-          <strong className="text-ink-900">{rows.length}</strong> {rows.length === 1 ? "município" : "municípios"}
-          {areaLabel && (
-            <>
-              {" "}· gastos em <strong className="text-ink-900">{areaLabel}</strong>
-            </>
-          )}{" "}
-          · {year}
-        </p>
-        <p className="text-sm text-ink-500">
-          Mediana de Sergipe: <strong className="text-ink-900">{formatBRL(stateMedian)}</strong> de gasto por habitante
-          {areaLabel ? ` em ${areaLabel}` : ""}
-          {hasFilters && (
-            <>
-              {" "}·{" "}
-              <Link href={`/municipios?ano=${year}`} className="text-brand-700 underline underline-offset-2">
-                limpar filtros
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p aria-live="polite" className="text-[15px] text-ink-700" data-testid="result-count">
+            <strong className="font-semibold text-ink-900">
+              {rows.length === 75 ? "Mostrando os 75 municípios" : `${rows.length} de 75 municípios`}
+            </strong>{" "}
+            · dados de {year}
+            {areaLabel && ` · gastos em ${areaLabel.toLowerCase()}`} · mediana por habitante: {formatBRL(stateMedian)}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {chips.map((c) => (
+              <Link
+                key={c.label}
+                href={c.href}
+                scroll={false}
+                className="flex h-8 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 text-[13px] font-medium text-brand-700 hover:border-brand-300"
+                aria-label={`Remover filtro ${c.label}`}
+              >
+                {c.label} <span aria-hidden>✕</span>
               </Link>
-            </>
-          )}
-          {" "}·{" "}
-          <a href={`/dados/municipios?ano=${year}`} className="text-brand-700 underline underline-offset-2">
-            baixar CSV de {year}
-          </a>
-        </p>
-      </div>
-
-      <DataTable testId="municipality-table" minWidth={880}>
-        <thead>
-          <tr>
-            {(Object.keys(SORTS) as SortKey[]).map((key) => (
-              <Th key={key} align={SORTS[key].align}>
-                <Link
-                  href={sortHref(key)}
-                  scroll={false}
-                  aria-sort={sortKey === key ? (key === "nome" ? "ascending" : "descending") : undefined}
-                  className={`hover:text-brand-700 ${sortKey === key ? "text-ink-900" : ""}`}
-                >
-                  {SORTS[key].label}
-                  <span aria-hidden className={sortKey === key ? "" : "opacity-0"}> {key === "nome" ? "↑" : "↓"}</span>
-                </Link>
-              </Th>
             ))}
-            <Th>Território</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.code} className="hover:bg-paper-200/40">
-              <Td>
-                <Link
-                  href={`/municipios/${r.slug}?ano=${year}${area ? `&area=${area}#evolucao` : ""}`}
-                  className="font-semibold text-brand-800 hover:underline"
-                >
-                  {r.name}
-                </Link>
-              </Td>
-              <Td align="right">{formatInteger(r.population)}</Td>
-              <Td align="right" className="text-ink-700">{area ? "—" : formatBRL(r.revenuePerCapita)}</Td>
-              <Td align="right" className="font-semibold">{formatBRL(r.paidPerCapita)}</Td>
-              <Td align="right">
-                <div className="ml-auto flex max-w-32 items-center justify-end gap-2">
-                  <div className="w-14">
-                    <ProgressBar ratio={r.execution} label={`${formatPercent(r.execution)} executado`} />
-                  </div>
-                  <span className="w-12">{formatPercent(r.execution)}</span>
-                </div>
-              </Td>
-              <Td align="right">
-                {r.insightCount > 0 ? (
-                  <Link
-                    href={`/municipios/${r.slug}?ano=${year}#atencao`}
-                    className="inline-block min-w-7 rounded-full bg-alert-100 px-2 text-center font-semibold text-alert-800 hover:bg-alert-200"
-                  >
-                    {r.insightCount}
-                  </Link>
-                ) : (
-                  <span className="text-ink-500">—</span>
-                )}
-              </Td>
-              <Td className="text-ink-700">{r.territory}</Td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={7} className="py-8 text-center text-ink-500">
-                Nenhum município corresponde aos filtros.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </DataTable>
-      <BudgetSource year={year} />
+            <a href={`/dados/municipios?ano=${year}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
+              <DownloadIcon /> Baixar CSV de {year}
+            </a>
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-2.5 rounded-lg border border-dashed border-paper-400 bg-white px-6 py-10 text-center">
+            <h2 className="text-[19px] font-semibold text-ink-900">Nenhum município com esses filtros</h2>
+            <p className="text-[15px] text-ink-500">Tente outro nome ou remova um dos filtros.</p>
+            <Link href={`/municipios?ano=${year}`} className="btn btn-secondary mt-1 border-brand-700 text-brand-700">
+              Limpar filtros
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block">
+              <DataTable testId="municipality-table" minWidth={960} caption={`Municípios de Sergipe, ${year}`}>
+                <thead>
+                  <tr>
+                    {columns.map((key) => {
+                      const active = key === sortKey;
+                      return (
+                        <Th
+                          key={key}
+                          align={key === "nome" ? "left" : "right"}
+                          className="p-0!"
+                          sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                        >
+                          <Link
+                            href={sortHref(key)}
+                            scroll={false}
+                            className={`flex h-12 items-center gap-1 px-4 ${key === "nome" ? "justify-start" : "justify-end"} ${
+                              active ? "bg-brand-100 text-brand-900" : "hover:text-brand-700"
+                            }`}
+                          >
+                            {key === "gasto" && areaLabel ? `${areaLabel}/hab.` : key === "pago" && areaLabel ? `Pago em ${areaLabel.toLowerCase()}` : SORTS[key].label}
+                            <span aria-hidden className={`text-[10px] ${active ? "text-brand-700" : "text-paper-400"}`}>
+                              {active ? (dir === "asc" ? "▲" : "▼") : "↕"}
+                            </span>
+                          </Link>
+                        </Th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.code}>
+                      <Td>
+                        <Link
+                          href={`/municipios/${r.slug}?ano=${year}${area ? `&area=${area}#gastos` : ""}`}
+                          className="font-semibold text-brand-700 hover:underline"
+                        >
+                          {r.name}
+                        </Link>
+                        <span className="block text-[13px] text-ink-500">
+                          {r.territory} · {r.sizeClass?.label.toLowerCase() ?? "—"}
+                        </span>
+                      </Td>
+                      <Td align="right">{formatInteger(r.population)}</Td>
+                      <Td align="right" className="font-semibold text-ink-900">
+                        {r.paid == null ? <NotDeclared /> : formatBRLCompact(r.paid)}
+                      </Td>
+                      <Td align="right">{r.paidPerCapita == null ? "—" : formatBRL(r.paidPerCapita)}</Td>
+                      {!area && <Td align="right">{r.revenuePerCapita == null ? "—" : formatBRL(r.revenuePerCapita)}</Td>}
+                      <Td align="right">
+                        <div className="ml-auto flex max-w-32 items-center justify-end gap-2">
+                          <div className="w-12">
+                            <ProgressBar ratio={r.execution} label={`${formatPercent(r.execution)} executado`} />
+                          </div>
+                          <span className="w-12">{formatPercent(r.execution)}</span>
+                        </div>
+                      </Td>
+                      <Td align="right">
+                        <Personnel row={r} />
+                      </Td>
+                      <Td align="right">
+                        {r.insightCount > 0 ? (
+                          <Link href={`/municipios/${r.slug}?ano=${year}#atencao`} className="hover:opacity-80">
+                            <AttentionTag row={r} />
+                          </Link>
+                        ) : (
+                          <AttentionTag row={r} />
+                        )}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            </div>
+
+            <div className="flex flex-col gap-3 md:hidden">
+              <FilterForm action="/municipios" className="flex items-end gap-2">
+                {Object.entries(params).map(([k, v]) => v && <input key={k} type="hidden" name={k} value={v} />)}
+                <SelectField
+                  name="ordem"
+                  label="Ordenar por"
+                  value={sortKey}
+                  className="flex-1"
+                  options={(Object.keys(SORTS) as SortKey[]).map((k) => ({ value: k, label: SORTS[k].label }))}
+                />
+              </FilterForm>
+              <ul className="flex flex-col gap-2">
+                {rows.map((r) => (
+                  <li key={r.code}>
+                    <Link href={`/municipios/${r.slug}?ano=${year}`} className="card block px-4 py-3.5">
+                      <span className="flex items-start justify-between gap-2">
+                        <span>
+                          <span className="block text-[17px] font-semibold text-brand-700">{r.name}</span>
+                          <span className="block text-[13px] text-ink-500">
+                            {r.territory} · {formatInteger(r.population)} hab.
+                          </span>
+                        </span>
+                        <AttentionTag row={r} />
+                      </span>
+                      <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 tabular-nums">
+                        <div>
+                          <dt className="text-xs text-ink-500">Por habitante</dt>
+                          <dd className="text-[15px] font-semibold text-ink-900">{formatBRL(r.paidPerCapita)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-ink-500">Executado</dt>
+                          <dd className="text-[15px] font-semibold text-ink-900">{formatPercent(r.execution)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-ink-500">Pessoal</dt>
+                          <dd className="text-[15px] font-semibold text-ink-900">
+                            <Personnel row={r} />
+                          </dd>
+                        </div>
+                      </dl>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+        <SourceNote>
+          SICONFI/Tesouro Nacional: DCA Anexo I-E (pago e população), RREO Anexo 02 (orçamento), DCA Anexo I-C (receita) e
+          RGF Anexo 01 (pessoal, % da receita corrente líquida; ▲ acima do limite de 54%), {year}. Valores em reais de{" "}
+          {year}.
+        </SourceNote>
+      </div>
     </>
   );
 }

@@ -5,24 +5,38 @@ import Section from "@/components/ui/Section";
 import SectionNav from "@/components/ui/SectionNav";
 import SelectField from "@/components/ui/SelectField";
 import ShareButtons from "@/components/ui/ShareButtons";
-import AreaTable from "@/features/budget/components/AreaTable";
+import SourceNote from "@/components/ui/SourceNote";
+import Term from "@/components/ui/Term";
 import BudgetKeyFigures from "@/features/budget/components/BudgetKeyFigures";
-import BudgetSource from "@/features/budget/components/BudgetSource";
-import BudgetSummary from "@/features/budget/components/BudgetSummary";
 import DataSources from "@/features/budget/components/DataSources";
 import EvolutionSection, { parseReal } from "@/features/budget/components/EvolutionSection";
-import HundredReais from "@/features/budget/components/HundredReais";
 import RevenueBreakdown from "@/features/budget/components/RevenueBreakdown";
+import SpendingBreakdown from "@/features/budget/components/SpendingBreakdown";
 import { getEntityYear, parseArea, parseYear, STATE_CODE } from "@/features/budget/data";
+import { budgetLede, revenueHeadline, spendingHeadline } from "@/features/budget/headlines";
 import { getAreaRows, getPerCapitaSeries, pickFigures } from "@/features/budget/metrics";
 import { yearOptions } from "@/features/budget/options";
-import InsightList, { InsightDisclaimer } from "@/features/insights/components/InsightList";
+import InsightList, { InsightDisclaimer, insightsHeadline } from "@/features/insights/components/InsightList";
 import { getInsights } from "@/features/insights/rules";
-import { getLegalChecks } from "@/features/legal/checks";
+import { getLegalChecks, legalHeadline } from "@/features/legal/checks";
 import LegalChecks, { LegalNote } from "@/features/legal/components/LegalChecks";
 import { formatBRLShort, formatInteger } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Raio-x do Governo do Estado" };
+
+const CHAPTERS = [
+  { id: "resumo", label: "Resumo" },
+  { id: "obrigacoes", label: "Obrigações legais" },
+  { id: "atencao", label: "Pontos de atenção" },
+  { id: "receitas", label: "De onde vem" },
+  { id: "gastos", label: "Para onde vai" },
+  { id: "evolucao", label: "Evolução" },
+  { id: "fontes", label: "Dados e fontes" },
+];
+const eyebrow = (id: string) => {
+  const i = CHAPTERS.findIndex((c) => c.id === id);
+  return `${i + 1} · ${CHAPTERS[i].label}`;
+};
 
 export default async function StatePage({ searchParams }: PageProps<"/estado">) {
   const query = await searchParams;
@@ -36,103 +50,122 @@ export default async function StatePage({ searchParams }: PageProps<"/estado">) 
   const legal = getLegalChecks(STATE_CODE, year);
   const legalIssues = legal.filter((c) => c.status !== "ok" && c.status !== "unknown").length;
 
-  const chapters = [
-    { id: "resumo", number: "01", label: "Resumo" },
-    { id: "obrigacoes", number: "02", label: "Obrigações legais", badge: legalIssues },
-    { id: "atencao", number: "03", label: "Pontos de atenção", badge: insights.length },
-    { id: "receitas", number: "04", label: "De onde vem o dinheiro" },
-    { id: "gastos", number: "05", label: "Para onde vai" },
-    { id: "evolucao", number: "06", label: "Evolução" },
-    { id: "fontes", number: "07", label: "Dados e fontes" },
-  ];
+  const chapters = CHAPTERS.map((c) => ({
+    ...c,
+    badge: c.id === "obrigacoes" ? legalIssues : c.id === "atencao" ? insights.length : undefined,
+  }));
 
   return (
-    <article>
+    <article id="topo">
       <PageHeader
-        eyebrow="Raio-x do orçamento"
+        breadcrumb={[{ label: "Início", href: "/" }, { label: "Governo do Estado" }]}
+        eyebrow={`Raio-x do Governo do Estado · ${year}`}
         title="Governo do Estado de Sergipe"
-        description={
-          <p className="text-base">
-            Poder Executivo e demais órgãos estaduais · população de {formatInteger(figures.population)} em {year}
-          </p>
-        }
+        description="O orçamento estadual é separado do das prefeituras: segurança pública, ensino médio, hospitais regionais e estradas estaduais são responsabilidade do Estado."
+        meta={["Poder Executivo e demais órgãos estaduais", `${formatInteger(figures.population)} habitantes`]}
         aside={
           <FilterForm>
             {area && <input type="hidden" name="area" value={area} />}
-            <SelectField name="ano" label="Ano" value={String(year)} options={yearOptions()} />
+            {!real && <input type="hidden" name="inflacao" value="nao" />}
+            <SelectField name="ano" label="Ano" value={String(year)} options={yearOptions()} className="w-28" />
           </FilterForm>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-        <aside>
-          <SectionNav title="Neste raio-x" items={chapters} />
-        </aside>
-        <div>
-          <Section
-            id="resumo"
-            number="01"
-            title={`${year} em poucas palavras`}
-            actions={
-              <ShareButtons
-                path="/estado"
-                text={`Governo de Sergipe em ${year}: arrecadou ${formatBRLShort(entity?.revenue?.total)} e pagou ${formatBRLShort(entity?.paid)}.`}
-              />
-            }
-          >
-            <BudgetSummary name="o Governo do Estado" year={year} entity={entity} areas={areas} insightCount={insights.length} />
-            <div className="mt-6">
-              <BudgetKeyFigures figures={figures} year={year} />
-            </div>
-          </Section>
+      <SectionNav title="Capítulos do raio-x" items={chapters} />
 
-          <Section
-            id="obrigacoes"
-            number="02"
-            title="Obrigações legais"
-            description="O que a Constituição e a Lei de Responsabilidade Fiscal exigem do Estado (saúde: 12%; pessoal: 49% da RCL), e o que foi declarado."
-          >
-            <LegalChecks checks={legal} />
-            <LegalNote />
-          </Section>
+      <div className="page flex flex-col gap-5 pt-6 lg:pt-10">
+        <Section
+          id="resumo"
+          eyebrow={eyebrow("resumo")}
+          titleStyle="lede"
+          title={<span data-testid="summary">{budgetLede("o Governo do Estado", year, entity)}</span>}
+          actions={
+            <ShareButtons
+              path="/estado"
+              text={`Governo de Sergipe em ${year}: arrecadou ${formatBRLShort(entity?.revenue?.total)} e pagou ${formatBRLShort(entity?.paid)}.`}
+            />
+          }
+        >
+          <BudgetKeyFigures figures={figures} year={year} legislature="Assembleia Legislativa" />
+          {insights.length > 0 && (
+            <a
+              href="#atencao"
+              className="flex min-h-11 items-center gap-2.5 self-start rounded-md border border-alert-200 bg-alert-50 px-3.5 text-[15px] font-medium text-alert-800"
+            >
+              <span aria-hidden className="text-xs text-alert-500">
+                ▲
+              </span>
+              {insights.length === 1 ? "1 ponto de atenção neste ano." : `${insights.length} pontos de atenção neste ano.`}
+              <span className="underline">Ver capítulo 3</span>
+            </a>
+          )}
+          <SourceNote>
+            SICONFI/Tesouro Nacional: RREO Anexo 02 (orçamento previsto e atualizado, 6º bimestre) e DCA Anexo I-E (gasto
+            pago e população), {year}.
+          </SourceNote>
+        </Section>
 
-          <Section id="atencao" number="03" title="Pontos de atenção" description={<InsightDisclaimer />}>
-            <InsightList insights={insights} entitySlug="estado" />
-          </Section>
+        <Section
+          id="obrigacoes"
+          eyebrow={eyebrow("obrigacoes")}
+          title={legalHeadline(legal)}
+          description="Para os estados, o mínimo da saúde é 12% e o limite de pessoal do Executivo é 49% da receita corrente líquida. A linha tracejada marca o mínimo ou o limite."
+          backToTop
+        >
+          <LegalChecks checks={legal} />
+          <LegalNote />
+        </Section>
 
-          <Section
-            id="receitas"
-            number="04"
-            title="De onde vem o dinheiro"
-            description="Receita do Estado por origem, já descontada a parte do ICMS e do IPVA que pertence aos municípios."
-          >
-            <RevenueBreakdown entity={entity} isState />
-          </Section>
+        <Section id="atencao" eyebrow={eyebrow("atencao")} title={insightsHeadline(insights.length, year)} description={<InsightDisclaimer />} backToTop>
+          <InsightList insights={insights} entitySlug="estado" />
+        </Section>
 
-          <Section id="gastos" number="05" title="Para onde vai o dinheiro" description="Previsto e pago em cada área. Clique numa área para ver a evolução dela.">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="order-2 xl:order-1">
-                <AreaTable rows={areas} showMedian={false} areaHref={(code) => `/estado?ano=${year}&area=${code}#evolucao`} />
-              </div>
-              <div className="order-1 xl:order-2">
-                <HundredReais rows={areas} who="o Governo do Estado" />
-              </div>
-            </div>
-            <BudgetSource year={year} />
-          </Section>
+        <Section
+          id="receitas"
+          eyebrow={eyebrow("receitas")}
+          title={revenueHeadline(entity, true)}
+          description={
+            <p className="text-[15px] text-ink-500">
+              Receita do Estado por origem, em % do total · {year}. Já descontada a parte do ICMS e do IPVA que pertence aos
+              municípios.
+            </p>
+          }
+          backToTop
+        >
+          <RevenueBreakdown entity={entity} year={year} isState />
+        </Section>
 
-          <EvolutionSection
-            number="06"
-            year={year}
-            area={area}
-            real={real}
-            main={{ label: "Governo do Estado", points: getPerCapitaSeries(STATE_CODE, area, real) }}
-          />
+        <Section
+          id="gastos"
+          eyebrow={eyebrow("gastos")}
+          title={spendingHeadline(areas)}
+          description={
+            <p className="text-[15px] text-ink-500">
+              Gasto pago por área (<Term id="funcao">função de governo</Term>) · {year}. Escolha uma área para destacá-la e
+              ver a evolução dela no capítulo 6.
+            </p>
+          }
+          backToTop
+        >
+          <SpendingBreakdown rows={areas} year={year} area={area} basePath="/estado" keep={real ? {} : { inflacao: "nao" }} showMedian={false} />
+          <SourceNote>
+            SICONFI/Tesouro Nacional: DCA Anexo I-E (pago) e RREO Anexo 02 (previsto e atualizado), por função, {year}.
+          </SourceNote>
+        </Section>
 
-          <Section id="fontes" number="07" title="Dados e fontes">
-            <DataSources code={STATE_CODE} name="o Governo do Estado" year={year} csvHref="/dados/estado" />
-          </Section>
-        </div>
+        <EvolutionSection
+          eyebrow={eyebrow("evolucao")}
+          year={year}
+          area={area}
+          real={real}
+          basePath="/estado"
+          main={{ label: "Governo do Estado", points: getPerCapitaSeries(STATE_CODE, area, real) }}
+        />
+
+        <Section id="fontes" eyebrow={eyebrow("fontes")} title="Baixe os números e confira na fonte" backToTop>
+          <DataSources code={STATE_CODE} title="Raio-x do Governo do Estado de Sergipe" name="o Governo do Estado" year={year} csvHref="/dados/estado" />
+        </Section>
       </div>
     </article>
   );
