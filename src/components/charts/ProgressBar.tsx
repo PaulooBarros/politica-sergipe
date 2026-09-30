@@ -7,8 +7,8 @@ type Props = {
 export default function ProgressBar({ ratio, label }: Props) {
   if (ratio == null) return null;
   return (
-    <div className="h-1.5 w-full rounded-full bg-brand-100" role="img" aria-label={label} title={label}>
-      <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+    <div className="h-2 w-full rounded-[2px] bg-paper-200" role="img" aria-label={label} title={label}>
+      <div className="h-full rounded-[2px] bg-brand-500" style={{ width: `${Math.min(100, ratio * 100)}%` }} />
     </div>
   );
 }
