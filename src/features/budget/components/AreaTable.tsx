@@ -2,7 +2,7 @@ import Link from "next/link";
 import ComparisonBar from "@/components/charts/ComparisonBar";
 import ProgressBar from "@/components/charts/ProgressBar";
 import { DataTable, Td, Th } from "@/components/ui/DataTable";
-import { formatBRL, formatBRLShort, formatPercent } from "@/lib/format";
+import { formatBRL, formatBRLCompact, formatPercent } from "@/lib/format";
 import type { AreaRow } from "../metrics";
 
 type Props = {
@@ -18,16 +18,16 @@ export default function AreaTable({ rows, showMedian, areaHref }: Props) {
   return (
     <>
       {showMedian && (
-        <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-700">
+        <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-700">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-4 rounded-sm bg-brand-500" aria-hidden /> Gasto por habitante
+            <span className="inline-block h-2.5 w-4 rounded-[2px] bg-brand-500" aria-hidden /> Gasto por habitante
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-3.5 w-[3px] rounded-full bg-alert-500" aria-hidden /> Mediana dos municípios de Sergipe
+            <span className="inline-block h-3.5 w-0.5 bg-ink-900" aria-hidden /> Mediana dos municípios de Sergipe
           </span>
         </div>
       )}
-      <DataTable testId="area-table" minWidth={760}>
+      <DataTable testId="area-table" minWidth={760} caption="Previsto, pago e executado por área">
         <thead>
           <tr>
             <Th>Área</Th>
@@ -41,14 +41,14 @@ export default function AreaTable({ rows, showMedian, areaHref }: Props) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.code} className="hover:bg-paper-200/40">
+            <tr key={r.code}>
               <Td>
-                <Link href={areaHref(r.code)} scroll={false} className="font-medium text-brand-800 hover:underline">
+                <Link href={areaHref(r.code)} scroll={false} className="font-medium text-brand-700 hover:underline">
                   {r.name}
                 </Link>
               </Td>
-              <Td align="right" className="text-ink-500">{formatBRLShort(r.planned)}</Td>
-              <Td align="right" className="font-medium">{formatBRLShort(r.paid)}</Td>
+              <Td align="right" className="text-ink-500">{formatBRLCompact(r.planned)}</Td>
+              <Td align="right" className="font-semibold text-ink-900">{formatBRLCompact(r.paid)}</Td>
               <Td>
                 <div className="flex items-center gap-2">
                   <span className="w-12 tabular-nums">{formatPercent(r.execution)}</span>
@@ -57,8 +57,8 @@ export default function AreaTable({ rows, showMedian, areaHref }: Props) {
                   </div>
                 </div>
               </Td>
-              <Td align="right" className="text-ink-700">{formatPercent(r.share)}</Td>
-              <Td align="right" className="font-medium">{formatBRL(r.paidPerCapita)}</Td>
+              <Td align="right">{formatPercent(r.share)}</Td>
+              <Td align="right" className="font-medium text-ink-900">{formatBRL(r.paidPerCapita)}</Td>
               {showMedian && (
                 <Td>
                   <ComparisonBar
@@ -67,7 +67,7 @@ export default function AreaTable({ rows, showMedian, areaHref }: Props) {
                     max={max}
                     label={`${r.name}: ${formatBRL(r.paidPerCapita)} por habitante; mediana de Sergipe ${formatBRL(r.stateMedianPerCapita)}`}
                   />
-                  <p className="mt-1 text-xs tabular-nums text-ink-500">Mediana SE: {formatBRL(r.stateMedianPerCapita)}</p>
+                  <p className="mt-1 text-xs text-ink-500 tabular-nums">Mediana SE: {formatBRL(r.stateMedianPerCapita)}</p>
                 </Td>
               )}
             </tr>
