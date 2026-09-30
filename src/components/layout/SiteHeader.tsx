@@ -1,21 +1,29 @@
 import Link from "next/link";
+import { DOWNLOADED_AT } from "@/features/budget/data";
+import { formatDate } from "@/lib/format";
 import MainNav from "./MainNav";
 import StateMark from "./StateMark";
 
+/** Institutional strip (neutrality notice and data date) above the aubergine navigation bar. */
 export default function SiteHeader() {
   return (
-    <header className="bg-brand-900 text-white">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-3 py-3" aria-label="Página inicial">
-          <span className="grid h-10 w-10 place-items-center rounded-md bg-white/10">
-            <StateMark className="h-7 w-7 text-white" />
-          </span>
-          <span className="leading-tight">
-            <span className="block text-[15px] font-semibold tracking-tight">Contas públicas</span>
-            <span className="block text-xs text-brand-200">Sergipe · dados oficiais</span>
-          </span>
-        </Link>
-        <MainNav />
+    <header>
+      <div className="bg-brand-950 text-[13px] leading-[18px] text-brand-200">
+        <div className="page flex items-center justify-between gap-4 py-[7px]">
+          <span>Portal informativo e apartidário · dados oficiais do Tesouro Nacional e do IBGE</span>
+          <span className="hidden text-brand-300 lg:inline">Dados consultados em {formatDate(DOWNLOADED_AT)}</span>
+        </div>
+      </div>
+      <div className="relative bg-brand-900 text-white">
+        <div className="page flex h-16 items-center gap-8">
+          <Link href="/" className="flex min-h-11 shrink-0 items-center gap-3 text-white" aria-label="Contas públicas · Sergipe, página inicial">
+            <StateMark className="h-[34px] w-[30px] text-brand-100" />
+            <span className="text-base font-semibold tracking-tight whitespace-nowrap">
+              Contas públicas <span className="font-medium text-brand-300">· Sergipe</span>
+            </span>
+          </Link>
+          <MainNav />
+        </div>
       </div>
     </header>
   );
