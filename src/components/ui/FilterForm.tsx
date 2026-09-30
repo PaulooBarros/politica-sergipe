@@ -11,8 +11,8 @@ type Props = {
 };
 
 /**
- * GET form that writes its fields to the URL. Selects submit on change, so
- * filters are shareable links and work without extra client state.
+ * GET form that writes its fields to the URL. Selects and radio buttons submit
+ * on change, so filters are shareable links and work without extra client state.
  */
 export default function FilterForm({ action = "", children, className }: Props) {
   return (
@@ -22,7 +22,8 @@ export default function FilterForm({ action = "", children, className }: Props) 
       replace
       className={className}
       onChange={(e) => {
-        if (e.target instanceof HTMLSelectElement) e.currentTarget.requestSubmit();
+        const t = e.target;
+        if (t instanceof HTMLSelectElement || (t instanceof HTMLInputElement && t.type === "radio")) e.currentTarget.requestSubmit();
       }}
     >
       {children}
