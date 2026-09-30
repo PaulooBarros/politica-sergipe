@@ -137,17 +137,36 @@ export function getPeerStats(code: string, year: number): PeerStat[] {
   ];
 }
 
-/** Sum of all municipalities (not the state government). */
-export function getMunicipalTotals(year: number): Figures & { revenue: number } {
-  const rows = getMunicipalityRows(year);
+/**
+ * Sum of the municipalities that declared their spending (not the state government).
+ * Population counts only those, so per-capita values are not diluted by missing data.
+ */
+export function getMunicipalTotals(year: number): Figures & { revenue: number; declared: number } {
+  const rows = getMunicipalityRows(year).filter((r) => r.paid != null);
   const sum = (pick: (r: MunicipalityRow) => number | null) => rows.reduce((acc, r) => acc + (pick(r) ?? 0), 0);
   return {
+    declared: rows.length,
     population: sum((r) => r.population),
     planned: sum((r) => r.planned),
     authorized: sum((r) => r.authorized),
     paid: sum((r) => r.paid),
     revenue: sum((r) => r.revenue),
   };
+}
+
+/** Amount paid per area by all municipalities together, largest first. */
+export function getMunicipalAreaTotals(year: number) {
+  const totals = new Map<string, number>();
+  for (const m of MUNICIPALITIES) {
+    const entity = getEntityYear(m.code, year);
+    if (entity?.paid == null) continue;
+    for (const [fn, v] of Object.entries(entity.byFunction)) totals.set(fn, (totals.get(fn) ?? 0) + (v.paid ?? 0));
+  }
+  const all = [...totals.values()].reduce((a, b) => a + b, 0);
+  return [...totals.entries()]
+    .map(([code, paid]) => ({ code, name: FUNCTIONS[code] ?? code, paid, share: all ? paid / all : 0 }))
+    .filter((a) => a.paid > 0)
+    .sort((a, b) => b.paid - a.paid);
 }
 
 export type AreaRow = {

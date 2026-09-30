@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 
-export default function SourceNote({ children }: { children: ReactNode }) {
+/** Source line under a chart or table: small, but always visible. */
+export default function SourceNote({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <p className="mt-3 text-xs leading-relaxed text-ink-500">
+    <p className={`text-xs leading-[17px] text-ink-500 ${className}`}>
       <span className="font-semibold">Fonte: </span>
       {children}
     </p>

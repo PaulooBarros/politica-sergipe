@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDownIcon } from "@/components/ui/Icons";
 
 type Option = { slug: string; name: string };
 
@@ -8,10 +9,52 @@ type Props = {
   entities: Option[];
   initialEntity: string;
   initialQuestion: string;
+  /** Most recent year with data, used in the model questions. */
+  year: number;
 };
 
+const MODELS = (year: number) => [
+  {
+    label: "Folha de pagamento",
+    hint: "Servidores, cargos e salários",
+    text: `Qual a relação de servidores ativos em ${year}, com cargo, tipo de vínculo, lotação e remuneração bruta mensal?`,
+  },
+  {
+    label: "Contratos e licitações",
+    hint: "Empresas contratadas e valores",
+    text: `Quais contratos foram firmados em ${year}, com objeto, empresa contratada, valor, vigência e processo licitatório correspondente?`,
+  },
+  {
+    label: "Execução do orçamento",
+    hint: "Quanto foi gasto em cada área",
+    text: `Qual a execução orçamentária de ${year} por função, subfunção e ação, com os valores empenhados, liquidados e pagos?`,
+  },
+  {
+    label: "Obras",
+    hint: "Andamento e custo",
+    text: `Quais obras estavam em andamento ou foram concluídas em ${year}, com localização, valor contratado, valor pago e percentual executado?`,
+  },
+];
+
+function Step({ n, children }: { n: number; children: string }) {
+  return (
+    <span className="flex items-center gap-2 text-[15px] font-semibold text-ink-900">
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700" aria-hidden>
+        {n}
+      </span>
+      {children}
+    </span>
+  );
+}
+
+const radio = (on: boolean) =>
+  `flex min-h-12 cursor-pointer items-center gap-2.5 rounded-md px-4 text-[15px] font-medium text-ink-900 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-300 ${
+    on ? "border-2 border-brand-700 bg-brand-50" : "border border-paper-400 bg-white hover:border-brand-400"
+  }`;
+const dot = (on: boolean) => `h-[18px] w-[18px] shrink-0 rounded-full bg-white ${on ? "border-[6px] border-brand-700" : "border-2 border-ink-500"}`;
+
 /** Builds a ready-to-send information request under the LAI (Lei 12.527/2011). */
-export default function LaiRequestBuilder({ entities, initialEntity, initialQuestion }: Props) {
+export default function LaiRequestBuilder({ entities, initialEntity, initialQuestion, year }: Props) {
   const [entity, setEntity] = useState(initialEntity);
   const [target, setTarget] = useState<"executivo" | "legislativo">("executivo");
   const [question, setQuestion] = useState(initialQuestion);
@@ -27,7 +70,7 @@ export default function LaiRequestBuilder({ entities, initialEntity, initialQues
       ? `Prefeitura Municipal de ${name}`
       : `Câmara Municipal de ${name}`;
 
-  const text = `À ${recipient}
+  const text = `Ao Serviço de Informação ao Cidadão (SIC) — ${recipient}
 
 Assunto: Pedido de acesso à informação (Lei nº 12.527/2011)
 
@@ -43,51 +86,83 @@ Atenciosamente,
 [seu nome]`;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="space-y-4">
-        <label className="flex flex-col gap-1 text-sm text-ink-700">
-          <span className="font-medium">Para qual ente?</span>
-          <select
-            value={entity}
-            onChange={(e) => setEntity(e.target.value)}
-            className="rounded-md border border-paper-300 bg-white px-3 py-2 text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-          >
-            {entities.map((e) => (
-              <option key={e.slug} value={e.slug}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+    <div className="grid items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+      <div className="flex flex-col gap-6">
+        <label className="flex flex-col gap-2">
+          <Step n={1}>Para qual ente?</Step>
+          <span className="relative block">
+            <select value={entity} onChange={(e) => setEntity(e.target.value)} className="field h-12 cursor-pointer appearance-none pr-10 font-medium">
+              {entities.map((e) => (
+                <option key={e.slug} value={e.slug}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3.5 h-2 w-3 -translate-y-1/2 text-ink-700" />
+          </span>
         </label>
-        <fieldset className="text-sm text-ink-700">
-          <legend className="font-medium">Enviar para</legend>
-          <div className="mt-1 flex flex-wrap gap-4">
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2">
+            <Step n={2}>Para quem enviar</Step>
+          </legend>
+          <div className="flex flex-wrap gap-2">
             {(["executivo", "legislativo"] as const).map((t) => (
-              <label key={t} className="flex items-center gap-2">
-                <input type="radio" name="target" checked={target === t} onChange={() => setTarget(t)} className="accent-brand-600" />
+              <label key={t} className={radio(target === t)}>
+                <input type="radio" name="target" checked={target === t} onChange={() => setTarget(t)} className="sr-only" />
+                <span className={dot(target === t)} aria-hidden />
                 {t === "executivo" ? (isState ? "Governo do Estado" : "Prefeitura") : isState ? "Assembleia Legislativa" : "Câmara Municipal"}
               </label>
             ))}
           </div>
         </fieldset>
-        <label className="flex flex-col gap-1 text-sm text-ink-700">
-          <span className="font-medium">Sua pergunta</span>
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={5}
-            placeholder="Ex.: Quais foram as 20 maiores despesas de 2025, com credor, contrato e objeto?"
-            className="rounded-md border border-paper-300 bg-white px-3 py-2 text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-          />
-        </label>
-        <p className="text-xs text-ink-500">
-          Dica: perguntas específicas (ano, área, tipo de documento) recebem respostas melhores. Você não precisa explicar
-          por que quer a informação (art. 10, § 3º).
-        </p>
+
+        <div className="flex flex-col gap-2">
+          <Step n={3}>O que você quer saber</Step>
+          <p className="text-[13px] text-ink-500">Comece por um modelo ou escreva a sua pergunta.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {MODELS(year).map((m) => {
+              const on = question === m.text;
+              return (
+                <button key={m.label} type="button" onClick={() => setQuestion(m.text)} aria-pressed={on} className={`${radio(on)} items-start py-3 text-left`}>
+                  <span className={`${dot(on)} mt-0.5`} aria-hidden />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="font-semibold">{m.label}</span>
+                    <span className="text-[13px] font-normal text-ink-500">{m.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <label className="mt-2 flex flex-col gap-1.5">
+            <span className="text-[13px] font-semibold text-ink-700">Sua pergunta</span>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={4}
+              placeholder={`Ex.: Quais foram as 20 maiores despesas de ${year}, com credor, contrato e objeto?`}
+              className="field resize-y py-2.5 leading-6"
+            />
+          </label>
+          <p className="text-[13px] text-ink-500">
+            Perguntas específicas (ano, área, tipo de documento) recebem respostas melhores. Você não precisa explicar por que
+            quer a informação (art. 10, § 3º).
+          </p>
+        </div>
       </div>
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-ink-900">Texto pronto do pedido</p>
+
+      <div className="flex flex-col gap-3 lg:sticky lg:top-6">
+        <div className="flex items-center justify-between">
+          <p className="text-[13px] font-semibold tracking-[0.08em] text-ink-500 uppercase">Seu pedido</p>
+          <p className="text-[13px] text-ink-500 tabular-nums">{text.length} caracteres</p>
+        </div>
+        <pre
+          className="max-h-[30rem] overflow-auto rounded-lg border border-paper-300 bg-paper-100 p-5 font-serif text-[17px] leading-[27px] whitespace-pre-wrap text-ink-900"
+          data-testid="lai-text"
+        >
+          {text}
+        </pre>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={async () => {
@@ -96,20 +171,18 @@ Atenciosamente,
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               } catch {
-                // Clipboard blocked: the text remains selectable below.
+                // Clipboard blocked: the text remains selectable above.
               }
             }}
-            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800"
+            className="btn btn-primary h-12 px-5 text-base"
           >
-            {copied ? "Copiado ✓" : "Copiar texto"}
+            <span aria-live="polite">{copied ? "✓ Texto copiado" : "Copiar texto"}</span>
           </button>
         </div>
-        <pre className="mt-2 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-md border border-paper-200 bg-paper-100 p-4 font-sans text-sm leading-relaxed text-ink-900" data-testid="lai-text">
-          {text}
-        </pre>
-        <p className="mt-2 text-xs text-ink-500">
-          Envie pelo Serviço de Informação ao Cidadão (e-SIC) no site da prefeitura, da Câmara ou do Governo do Estado. Se
-          não houver sistema on-line, o pedido pode ser protocolado presencialmente.
+        <p className="text-[13px] leading-[19px] text-ink-500">
+          Envie pelo Serviço de Informação ao Cidadão (e-SIC) no site da prefeitura, da Câmara, do Governo do Estado ou da
+          Assembleia. Sem sistema on-line, o pedido pode ser protocolado presencialmente. O portal não envia nem guarda o seu
+          pedido; guarde o número de protocolo.
         </p>
       </div>
     </div>

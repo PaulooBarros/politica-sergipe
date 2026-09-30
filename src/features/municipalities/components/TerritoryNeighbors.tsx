@@ -2,7 +2,7 @@ import Link from "next/link";
 import ProgressBar from "@/components/charts/ProgressBar";
 import { DataTable, Td, Th } from "@/components/ui/DataTable";
 import type { MunicipalityRow } from "@/features/budget/metrics";
-import { formatBRL, formatBRLShort, formatInteger, formatPercent } from "@/lib/format";
+import { formatBRL, formatBRLCompact, formatInteger, formatPercent } from "@/lib/format";
 
 type Props = {
   rows: MunicipalityRow[];
@@ -12,7 +12,7 @@ type Props = {
 
 export default function TerritoryNeighbors({ rows, currentCode, year }: Props) {
   return (
-    <DataTable minWidth={720}>
+    <DataTable minWidth={720} caption="Municípios do mesmo território">
       <thead>
         <tr>
           <Th>Município</Th>
@@ -27,20 +27,20 @@ export default function TerritoryNeighbors({ rows, currentCode, year }: Props) {
         {rows.map((r) => {
           const current = r.code === currentCode;
           return (
-            <tr key={r.code} className={current ? "bg-alert-50" : "hover:bg-paper-200/40"} aria-current={current ? "true" : undefined}>
+            <tr key={r.code} className={current ? "bg-brand-50" : undefined} aria-current={current ? "true" : undefined}>
               <Td>
                 {current ? (
-                  <span className="font-semibold">{r.name}</span>
+                  <span className="font-semibold text-ink-900">{r.name} (este)</span>
                 ) : (
-                  <Link href={`/municipios/${r.slug}?ano=${year}`} className="font-medium text-brand-800 hover:underline">
+                  <Link href={`/municipios/${r.slug}?ano=${year}`} className="font-medium text-brand-700 hover:underline">
                     {r.name}
                   </Link>
                 )}
               </Td>
               <Td align="right">{formatInteger(r.population)}</Td>
-              <Td align="right" className="text-ink-700">{formatBRL(r.revenuePerCapita)}</Td>
-              <Td align="right" className="font-medium">{formatBRL(r.paidPerCapita)}</Td>
-              <Td align="right" className="text-ink-700">{formatBRLShort(r.paid)}</Td>
+              <Td align="right">{formatBRL(r.revenuePerCapita)}</Td>
+              <Td align="right" className="font-semibold text-ink-900">{formatBRL(r.paidPerCapita)}</Td>
+              <Td align="right">{formatBRLCompact(r.paid)}</Td>
               <Td>
                 <div className="flex items-center gap-2">
                   <span className="w-12 tabular-nums">{formatPercent(r.execution)}</span>

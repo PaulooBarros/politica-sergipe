@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { DOWNLOADED_AT, LATEST_YEAR } from "@/features/budget/data";
+import { formatDate } from "@/lib/format";
+import { DownloadIcon } from "@/components/ui/Icons";
 import StateMark from "./StateMark";
 
 const COLUMNS = [
@@ -16,8 +18,8 @@ const COLUMNS = [
     title: "Participe",
     links: [
       { href: "/participe#calendario", label: "Calendário do orçamento" },
-      { href: "/participe#pedido", label: "Pedido de informação (LAI)" },
       { href: "/participe#quem-fiscaliza", label: "Quem fiscaliza" },
+      { href: "/participe#pedido", label: "Pedido de informação (LAI)" },
     ],
   },
   {
@@ -25,37 +27,41 @@ const COLUMNS = [
     links: [
       { href: "/sobre#glossario", label: "Glossário" },
       { href: "/sobre#criterios", label: "Critérios dos pontos de atenção" },
-      { href: "/sobre#metodologia", label: "Metodologia e fontes" },
-      { href: `/dados/municipios?ano=${LATEST_YEAR}`, label: `Baixar dados (CSV, ${LATEST_YEAR})` },
+      { href: "/sobre#metodologia", label: "Metodologia" },
+      { href: "/sobre#fontes", label: "Fontes" },
     ],
   },
 ];
 
 export default function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-paper-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 text-sm text-ink-700 sm:px-6 lg:grid-cols-[2fr_1fr_1fr_1fr]">
-        <div className="flex gap-3">
-          <StateMark className="h-8 w-8 shrink-0 text-brand-700" />
-          <div className="space-y-2">
-            <p className="max-w-sm">
-              Projeto independente e apartidário. Mostra apenas dados públicos oficiais, com a fonte e os critérios de
-              cada número.
-            </p>
-            <p className="text-xs text-ink-500">
-              Dados do Tesouro Nacional consultados em {new Date(`${DOWNLOADED_AT}T12:00:00`).toLocaleDateString("pt-BR")}.
-              Em breve: <Link href="/eleicoes" className="hover:underline">eleições</Link> e{" "}
-              <Link href="/quiz" className="hover:underline">quiz cívico</Link>.
-            </p>
+    <footer className="bg-brand-950 text-brand-100">
+      <div className="page grid gap-10 py-12 text-sm lg:grid-cols-[2fr_1fr_1fr_1fr]">
+        <div>
+          <div className="flex items-center gap-3">
+            <StateMark className="h-[34px] w-[30px] text-brand-200" />
+            <span className="text-base font-semibold tracking-tight text-white">
+              Contas públicas <span className="font-medium text-brand-300">· Sergipe</span>
+            </span>
           </div>
+          <p className="mt-4 max-w-sm leading-relaxed text-brand-200">
+            Projeto independente e apartidário. Mostra apenas dados públicos oficiais, com a fonte e o critério de cada
+            número. Não avalia gestões nem indica voto.
+          </p>
+          <a
+            href={`/dados/municipios?ano=${LATEST_YEAR}`}
+            className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-md border border-brand-200/40 px-3 text-white transition-colors hover:bg-white/10"
+          >
+            <DownloadIcon /> Baixar dados de {LATEST_YEAR} (CSV)
+          </a>
         </div>
         {COLUMNS.map((col) => (
           <div key={col.title}>
-            <p className="font-semibold text-ink-900">{col.title}</p>
-            <ul className="mt-2 space-y-1">
+            <h2 className="eyebrow text-brand-300">{col.title}</h2>
+            <ul className="mt-3 space-y-1">
               {col.links.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-brand-700 hover:underline">
+                  <Link href={l.href} className="inline-flex min-h-8 items-center text-brand-100 transition-colors hover:text-white hover:underline">
                     {l.label}
                   </Link>
                 </li>
@@ -63,6 +69,25 @@ export default function SiteFooter() {
             </ul>
           </div>
         ))}
+      </div>
+      <div className="border-t border-white/10">
+        <div className="page flex flex-wrap justify-between gap-x-6 gap-y-2 py-5 text-xs leading-relaxed text-brand-300">
+          <p>
+            Fontes: SICONFI/Tesouro Nacional (RREO, RGF e DCA), IBGE (malha municipal e IPCA). Dados consultados em{" "}
+            {formatDate(DOWNLOADED_AT)}.
+          </p>
+          <p>
+            Em breve:{" "}
+            <Link href="/eleicoes" className="underline underline-offset-2 hover:text-white">
+              eleições
+            </Link>{" "}
+            e{" "}
+            <Link href="/quiz" className="underline underline-offset-2 hover:text-white">
+              quiz cívico
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </footer>
   );

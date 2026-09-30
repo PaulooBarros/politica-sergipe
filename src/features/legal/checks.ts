@@ -6,6 +6,8 @@ export type CheckStatus = "ok" | "alert" | "prudential" | "fail" | "unknown";
 export type LegalCheck = {
   id: "education" | "health" | "fundebPay" | "personnel";
   label: string;
+  /** What the percentage is measured against, in plain words. */
+  base: string;
   glossary: GlossaryId;
   /** Percentage actually applied/spent, as declared. */
   value: number | null;
@@ -33,15 +35,17 @@ export function getLegalChecks(code: string, year: number): LegalCheck[] {
     glossary: GlossaryId,
     law: string,
     what: string,
+    base: string,
   ): LegalCheck => {
     const item = legal?.[id] ?? null;
     if (!item) {
-      return { id, label, glossary, value: null, threshold: null, kind: "minimum", status: "unknown", law, sentence: "Não declarado ao Tesouro Nacional para este ano." };
+      return { id, label, base, glossary, value: null, threshold: null, kind: "minimum", status: "unknown", law, sentence: "Não declarado ao Tesouro Nacional para este ano." };
     }
     const ok = item.applied >= item.minimum;
     return {
       id,
       label,
+      base,
       glossary,
       law,
       value: item.applied,
@@ -55,10 +59,12 @@ export function getLegalChecks(code: string, year: number): LegalCheck[] {
   };
 
   const personnel = legal?.personnel ?? null;
+  const personnelBase = "% da receita corrente líquida (Poder Executivo)";
   const personnelCheck: LegalCheck = personnel
     ? {
         id: "personnel",
         label: "Gasto com pessoal",
+        base: personnelBase,
         glossary: "limite-pessoal",
         law: "Lei de Responsabilidade Fiscal, arts. 19, 20 e 22",
         value: personnel.percent,
@@ -79,6 +85,7 @@ export function getLegalChecks(code: string, year: number): LegalCheck[] {
     : {
         id: "personnel",
         label: "Gasto com pessoal",
+        base: personnelBase,
         glossary: "limite-pessoal",
         law: "Lei de Responsabilidade Fiscal, arts. 19, 20 e 22",
         value: null,
@@ -89,9 +96,9 @@ export function getLegalChecks(code: string, year: number): LegalCheck[] {
       };
 
   return [
-    minimum("education", "Educação", "minimo-educacao", "Constituição Federal, art. 212", "da receita de impostos em manutenção e desenvolvimento do ensino"),
-    minimum("health", "Saúde", "minimo-saude", "Lei Complementar 141/2012, arts. 6º e 7º", "da receita de impostos em ações e serviços públicos de saúde"),
-    minimum("fundebPay", "Fundeb para profissionais da educação", "fundeb", "Lei 14.113/2020, art. 26", "do Fundeb na remuneração dos profissionais da educação"),
+    minimum("education", "Educação", "minimo-educacao", "Constituição Federal, art. 212", "da receita de impostos em manutenção e desenvolvimento do ensino", "% da receita de impostos aplicada no ensino"),
+    minimum("health", "Saúde", "minimo-saude", "Lei Complementar 141/2012, arts. 6º e 7º", "da receita de impostos em ações e serviços públicos de saúde", "% da receita de impostos aplicada em saúde"),
+    minimum("fundebPay", "Fundeb para profissionais da educação", "fundeb", "Lei 14.113/2020, art. 26", "do Fundeb na remuneração dos profissionais da educação", "% do Fundeb pago aos profissionais da educação"),
     personnelCheck,
   ];
 }
@@ -113,10 +120,29 @@ export function getLegalSummary(codes: string[], year: number) {
   };
 }
 
-export const STATUS_LABEL: Record<CheckStatus, string> = {
-  ok: "Dentro da regra",
-  alert: "Acima do limite de alerta",
-  prudential: "Acima do limite prudencial",
-  fail: "Fora da regra",
-  unknown: "Não declarado",
-};
+const MINIMUM_NAME: Record<string, string> = { education: "educação", health: "saúde", fundebPay: "Fundeb" };
+
+const list = (items: string[]) => (items.length <= 1 ? items[0] : `${items.slice(0, -1).join(", ")} e ${items.at(-1)}`);
+
+/** Chapter title stating what the declared numbers show, e.g. "Cumpriu os mínimos de educação e saúde, mas passou do limite de pessoal". */
+export function legalHeadline(checks: LegalCheck[]): string {
+  const minimums = checks.filter((c) => c.kind === "minimum" && c.status !== "unknown");
+  const personnel = checks.find((c) => c.id === "personnel");
+  if (minimums.length === 0 && (!personnel || personnel.status === "unknown")) {
+    return "As obrigações legais deste ano não foram declaradas ao Tesouro Nacional";
+  }
+
+  const met = minimums.filter((c) => c.status === "ok").map((c) => MINIMUM_NAME[c.id]);
+  const missed = minimums.filter((c) => c.status !== "ok").map((c) => MINIMUM_NAME[c.id]);
+  const good: string[] = [];
+  const bad: string[] = [];
+  if (met.length) good.push(`cumpriu ${met.length === 1 ? "o mínimo" : "os mínimos"} de ${list(met)}`);
+  if (missed.length) bad.push(`ficou abaixo do mínimo de ${list(missed)}`);
+  if (personnel?.status === "ok") good.push("ficou dentro do limite de pessoal");
+  if (personnel?.status === "fail") bad.push("passou do limite de gasto com pessoal");
+  if (personnel?.status === "prudential") bad.push("passou do limite prudencial de gasto com pessoal");
+  if (personnel?.status === "alert") bad.push("passou do limite de alerta de gasto com pessoal");
+
+  const sentence = good.length && bad.length ? `${list(good)}, mas ${list(bad)}` : list([...good, ...bad]);
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}

@@ -17,7 +17,7 @@ export function quantileBuckets(
   const bucketOf = (v: number) => breaks.filter((b) => v >= b).length;
 
   const legend = Array.from({ length: CLASSES }, (_, i) => {
-    if (i === 0) return `Até ${format(breaks[0])}`;
+    if (i === 0) return `até ${format(breaks[0])}`;
     if (i === CLASSES - 1) return `${format(breaks[CLASSES - 2])} ou mais`;
     return `${format(breaks[i - 1])} a ${format(breaks[i])}`;
   });
@@ -26,7 +26,7 @@ export function quantileBuckets(
     values: Object.fromEntries(
       Object.entries(values).map(([code, v]) => [
         code,
-        { label: v == null ? "não declarado" : format(v), bucket: v == null ? null : bucketOf(v) },
+        { value: v, label: v == null ? "não declarado" : format(v), bucket: v == null ? null : bucketOf(v) },
       ]),
     ),
     legend,

@@ -1,66 +1,48 @@
-import KeyFigure, { KeyFigureRow } from "@/components/ui/KeyFigure";
+import KeyFigure, { compareWith } from "@/components/ui/KeyFigure";
 import Term from "@/components/ui/Term";
-import { formatBRL, formatBRLShort, formatPercent } from "@/lib/format";
-import { type Comparison, type Figures, ratio } from "../metrics";
+import { formatBRL, formatBRLShort, formatInteger, formatPercent } from "@/lib/format";
+import { type Figures, ratio } from "../metrics";
 
 type Props = {
   figures: Figures;
   year: number;
-  comparisons?: Comparison[];
+  /** "Câmara" or "Assembleia Legislativa", who approves the budget law. */
+  legislature: string;
+  /** Per-capita median of same-size municipalities (omitted for the state). */
+  sizeMedianPerCapita?: number | null;
 };
 
-/** The four headline numbers: planned, paid, execution and per capita. */
-export default function BudgetKeyFigures({ figures, year, comparisons = [] }: Props) {
+/** The three headline numbers of an x-ray: planned, paid and per inhabitant. */
+export default function BudgetKeyFigures({ figures, year, legislature, sizeMedianPerCapita }: Props) {
   const execution = ratio(figures.paid, figures.authorized);
   const perCapita = ratio(figures.paid, figures.population);
 
   return (
-    <KeyFigureRow>
+    <div className="grid border-t border-paper-200 sm:grid-cols-2 lg:grid-cols-3">
       <KeyFigure
+        frame="plain"
         testId="stat-planned"
         label={<Term id="orcamento-previsto">Orçamento previsto</Term>}
-        value={formatBRLShort(figures.planned)}
-        tone={figures.planned == null ? "muted" : "default"}
-        explanation={
-          figures.planned == null
-            ? `O orçamento de ${year} não foi declarado ao Tesouro Nacional.`
-            : `Aprovado na lei do orçamento de ${year}. Ajustado durante o ano para ${formatBRLShort(figures.authorized)}.`
-        }
+        value={figures.planned == null ? null : formatBRLShort(figures.planned)}
+        explanation={`Aprovado pela ${legislature} na lei do orçamento (LOA) de ${year}.`}
+        comparison={figures.authorized != null && `Atualizado para ${formatBRLShort(figures.authorized)} ao longo do ano`}
       />
       <KeyFigure
+        frame="plain"
         testId="stat-paid"
         label={<Term id="pagamento">Gasto real (pago)</Term>}
-        value={formatBRLShort(figures.paid)}
-        tone={figures.paid == null ? "muted" : "default"}
-        explanation="O que efetivamente saiu do caixa para pagar despesas do ano."
+        value={figures.paid == null ? null : formatBRLShort(figures.paid)}
+        explanation="O que efetivamente saiu do caixa para pagar as despesas do ano."
+        comparison={execution != null && `${formatPercent(execution)} do orçamento atualizado foi pago`}
       />
       <KeyFigure
-        testId="stat-execution"
-        label={<Term id="execucao">Orçamento executado</Term>}
-        value={formatPercent(execution)}
-        explanation={
-          execution == null
-            ? "Não é possível calcular sem orçamento e gasto declarados."
-            : `De cada R$ 100 autorizados, R$ ${Math.round(execution * 100)} foram pagos.`
-        }
-      />
-      <KeyFigure
+        frame="plain"
         testId="stat-per-capita"
         label="Gasto por habitante"
-        value={formatBRL(perCapita)}
-        explanation={`Gasto real dividido pela população de ${year}.`}
-      >
-        {comparisons.length > 0 && (
-          <dl className="space-y-1">
-            {comparisons.map((c) => (
-              <div key={c.label} className="flex justify-between gap-3">
-                <dt className="text-ink-500">{c.label}</dt>
-                <dd className="whitespace-nowrap font-medium tabular-nums text-ink-900">{formatBRL(c.value)}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </KeyFigure>
-    </KeyFigureRow>
+        value={perCapita == null ? null : formatBRL(perCapita)}
+        explanation={`Gasto pago dividido pelos ${formatInteger(figures.population)} moradores considerados pelo Tesouro em ${year}.`}
+        comparison={compareWith(perCapita, sizeMedianPerCapita, "mediana do mesmo porte", formatBRL)}
+      />
+    </div>
   );
 }

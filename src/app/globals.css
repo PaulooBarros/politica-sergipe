@@ -4,6 +4,7 @@
  * Identidade institucional: branco e cinza-azulado (paper/ink), acento
  * berinjela (brand) e âmbar reservado para alertas (alert). Nenhuma das cores
  * remete a partido. Par brand-500/alert-500 validado para daltonismo sobre branco.
+ * Âmbar: 500 só para ícone ▲, barras e hachuras; texto usa 700 (sobre branco) ou 800 (sobre alert-50).
  */
 @theme {
   --color-brand-50: #f7f3fb;
@@ -29,21 +30,185 @@
   --color-alert-800: #78350f;
 
   --color-paper-50: #ffffff;
-  --color-paper-100: #f4f6f9;
-  --color-paper-200: #e3e8ef;
-  --color-paper-300: #cbd3de;
+  --color-paper-100: #f5f6f9;
+  --color-paper-200: #e6e9ef;
+  --color-paper-300: #cfd5df;
   --color-paper-400: #94a1b3;
 
   --color-ink-500: #5b6779;
   --color-ink-700: #334155;
   --color-ink-900: #0f172a;
+
+  /* Mapa: 5 faixas sequenciais com passos de luminosidade parecidos. */
+  --color-map-1: #ede4f6;
+  --color-map-2: #d0b9e6;
+  --color-map-3: #a882cf;
+  --color-map-4: #7c4dab;
+  --color-map-5: #432662;
+
+  --text-display: 3.75rem;
+  --text-display--line-height: 1.06;
+  --text-h1: 3rem;
+  --text-h1--line-height: 1.08;
+  --text-h2: 2rem;
+  --text-h2--line-height: 1.2;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.75rem;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.1875rem;
+
+  --radius-card: 0.5rem;
+  --radius-control: 0.375rem;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-pop: 0 10px 30px rgb(15 23 42 / 0.12);
+  --shadow-sheet: 0 -6px 24px rgb(15 23 42 / 0.18);
 }
 
 @theme inline {
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, serif;
+}
+
+/* Page width shared by header, footer and content bands. */
+@utility page {
+  width: 100%;
+  max-width: 75rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (min-width: 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (min-width: 64rem) {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Shared surfaces: thin border does the work, shadow only on floating layers. */
+@utility card {
+  border-radius: var(--radius-card);
+  background-color: var(--color-paper-50);
+  border: 1px solid var(--color-paper-200);
+}
+
+/* Small uppercase label above titles ("1 · Resumo", "Pontos de atenção · 2024"). */
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-brand-600);
+}
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius-control);
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+
+@utility btn-primary {
+  background-color: var(--color-brand-700);
+  color: white;
+  &:hover {
+    background-color: var(--color-brand-800);
+    color: white;
+  }
+}
+
+@utility btn-secondary {
+  background-color: var(--color-paper-50);
+  color: var(--color-ink-900);
+  border: 1px solid var(--color-paper-400);
+  font-weight: 500;
+  &:hover {
+    color: var(--color-brand-700);
+    border-color: var(--color-brand-700);
+  }
+}
+
+/* Form controls: 44px tall, grey border, brand focus. */
+@utility field {
+  width: 100%;
+  min-height: 2.75rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-paper-400);
+  background-color: var(--color-paper-50);
+  padding: 0 0.75rem;
+  font-size: 1rem;
+  color: var(--color-ink-900);
+  &::placeholder {
+    color: var(--color-ink-500);
+  }
+  &:focus {
+    border-color: var(--color-brand-600);
+  }
+}
+
+/* Link inside running text. */
+@utility link {
+  color: var(--color-brand-700);
+  text-decoration-line: underline;
+  text-decoration-color: var(--color-brand-300);
+  text-underline-offset: 3px;
+  &:hover {
+    color: var(--color-brand-900);
+    text-decoration-color: currentColor;
+  }
+}
+
+/* "Não declarado": grey hatch, never white or zero. */
+@utility bg-nd {
+  background-image: repeating-linear-gradient(135deg, var(--color-paper-100) 0 4px, var(--color-paper-300) 4px 5.5px);
+}
+
+/* Excess beyond a legal limit, in bars. */
+@utility bg-over {
+  background-image: repeating-linear-gradient(135deg, var(--color-alert-500) 0 4px, var(--color-alert-400) 4px 7px);
+}
+
+@utility bg-over-soft {
+  background-image: repeating-linear-gradient(135deg, var(--color-alert-50) 0 6px, var(--color-alert-100) 6px 8px);
+}
+
+html {
+  /* Anchor jumps land below the sticky chapter bar. */
+  scroll-padding-top: 4.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
-  font-family: var(--font-inter), system-ui, sans-serif;
-  font-feature-settings: "tnum" 0, "cv11" 1;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11" 1, "ss01" 1;
+}
+
+::selection {
+  background-color: var(--color-brand-200);
+  color: var(--color-brand-950);
+}
+
+/* One focus style everywhere; amber stays reserved for points of attention. */
+:where(a, button, summary, select, input, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-300);
+  outline-offset: 2px;
+}
+
+:where(input, select, textarea):focus-visible {
+  outline-offset: 1px;
 }

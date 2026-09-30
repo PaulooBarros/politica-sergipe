@@ -16,9 +16,9 @@ export default function CopyButton({ text, label = "Copiar", className = "" }: {
           // Clipboard blocked: the text stays visible for manual copy.
         }
       }}
-      className={`rounded-md border border-paper-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-brand-400 hover:text-brand-800 ${className}`}
+      className={`btn btn-secondary ${className}`}
     >
-      {copied ? "Copiado ✓" : label}
+      <span aria-live="polite">{copied ? "✓ Copiado" : label}</span>
     </button>
   );
 }
