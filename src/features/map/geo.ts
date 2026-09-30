@@ -39,10 +39,15 @@ export function getMunicipalityShapes(): MapShape[] {
   const projection = geoMercator().fitSize([MAP_WIDTH, MAP_HEIGHT], collection);
   const toPath = geoPath(projection);
 
-  return features.map((f) => ({
-    code: f.properties.code,
-    name: f.properties.name,
-    slug: slugify(f.properties.name),
-    d: toPath(f as GeoPermissibleObjects) ?? "",
-  }));
+  return features.map((f) => {
+    const [cx, cy] = toPath.centroid(f as GeoPermissibleObjects);
+    return {
+      code: f.properties.code,
+      name: f.properties.name,
+      slug: slugify(f.properties.name),
+      d: toPath(f as GeoPermissibleObjects) ?? "",
+      cx,
+      cy,
+    };
+  });
 }
